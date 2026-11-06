@@ -72,6 +72,8 @@ springdoc:
     path: /swagger-ui.html
 
 app:
+  product:
+    min-stock: ${PRODUCT_MIN_STOCK:0}  # searches show only products with stock > min-stock
   tokenization:
     rejection-probability: ${TOKENIZATION_REJECTION_PROBABILITY:0.1}
   crypto:
