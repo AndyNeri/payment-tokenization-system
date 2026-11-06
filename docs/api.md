@@ -130,10 +130,8 @@ Validaciones (en este orden):
 201 Created
 {
   "token": "tok_Vx2kq9...",
-  "last4": "1111",
   "brand": "VISA",
-  "expirationMonth": 12,
-  "expirationYear": 2029,
+  "last4": "1111",
   "createdAt": "2026-11-06T15:05:00Z"
 }
 ```
@@ -142,7 +140,8 @@ Validaciones (en este orden):
 - `404 CUSTOMER_NOT_FOUND`
 - `422 TOKENIZATION_REJECTED`: rechazo simulado según `app.tokenization.rejection-probability`.
 
-> La respuesta nunca incluye el PAN completo ni el CVV.
+> La respuesta nunca incluye el PAN completo, el CVV ni la fecha de expiración.
+> Acepta el número con espacios o guiones (`4111 1111 1111 1111`). Marcas soportadas: VISA, MASTERCARD, AMEX, DISCOVER, DINERS.
 
 ### Tarjetas del cliente
 ```http
@@ -150,8 +149,9 @@ GET /api/v1/me/cards
 Authorization: Bearer <jwt>
 
 200 OK
-[ { "token": "tok_Vx2kq9...", "last4": "1111", "brand": "VISA", "expirationMonth": 12, "expirationYear": 2029 } ]
+[ { "token": "tok_Vx2kq9...", "brand": "VISA", "last4": "1111", "createdAt": "2026-11-06T15:05:00Z" } ]
 ```
+> La fecha de expiración y el titular solo existen cifrados; las respuestas muestran marca y últimos 4 dígitos.
 
 ## Productos
 
