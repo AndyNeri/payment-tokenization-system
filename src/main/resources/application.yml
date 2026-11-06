@@ -1,0 +1,80 @@
+# =====================================================================
+# No secrets here: every sensitive value comes from environment variables
+# (.env locally via docker compose, Secret Manager on Cloud Run).
+# Business parameters have safe defaults and can be overridden the same way.
+# =====================================================================
+spring:
+  application:
+    name: payment-tokenization-system
+  threads:
+    virtual:
+      enabled: true                  # Java 25 virtual threads for request handling and @Async
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:10}
+  jpa:
+    open-in-view: false              # no lazy loading during view rendering (anti-pattern)
+    hibernate:
+      ddl-auto: validate             # Flyway owns the schema; Hibernate only checks it
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+  mail:
+    host: ${SMTP_HOST}
+    port: ${SMTP_PORT}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${SMTP_AUTH:false}
+          starttls:
+            enable: ${SMTP_STARTTLS:false}
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+  modulith:
+    events:
+      jdbc:
+        schema-initialization:
+          enabled: false             # table created by Flyway (V2__event_publication.sql)
+      republish-outstanding-events-on-restart: true
+
+server:
+  port: ${PORT:8080}
+  shutdown: graceful
+  error:
+    include-stacktrace: never
+    include-message: never
+
+management:
+  health:
+    mail:
+      enabled: false                 # SMTP outage must not mark the app DOWN: emails are async + retried (outbox)
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+app:
+  security:
+    api-key: ${API_KEY}
+    jwt:
+      secret: ${JWT_SECRET}          # Base64, >= 32 bytes decoded
+      ttl: ${JWT_TTL:30m}
+      issuer: ${JWT_ISSUER:payment-tokenization-system}

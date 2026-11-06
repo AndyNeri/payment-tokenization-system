@@ -1,0 +1,9 @@
+# Production profile (Cloud Run). Activated with SPRING_PROFILES_ACTIVE=prod.
+logging:
+  structured:
+    format:
+      console: ecs                   # JSON logs (with transactionId from MDC) for Cloud Logging
+
+springdoc:
+  swagger-ui:
+    enabled: ${SWAGGER_ENABLED:true}
