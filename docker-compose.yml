@@ -1,0 +1,48 @@
+# Local stack: app + PostgreSQL 18 + Mailpit (fake SMTP with web UI).
+#   cp .env.example .env   # then fill in the secrets (see comments in the file)
+#   docker compose up --build
+# API: http://localhost:8080  ·  Swagger: http://localhost:8080/swagger-ui.html  ·  Emails: http://localhost:8025
+name: payment-tokenization
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql   # PostgreSQL 18 images store data under /var/lib/postgresql/<version>
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  mailpit:
+    image: axllent/mailpit:v1.33
+    ports:
+      - "1025:1025"   # SMTP
+      - "8025:8025"   # Web UI
+
+  app:
+    build: .
+    env_file: .env
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+      DB_USERNAME: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+
+volumes:
+  pgdata:
