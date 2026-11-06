@@ -1,0 +1,14 @@
+# Test-only values (fake, not secrets). The datasource is provided by Testcontainers (@ServiceConnection).
+spring:
+  mail:
+    host: localhost
+    port: 3025
+
+app:
+  security:
+    api-key: test-api-key-0123456789-abcdefghijklmnop
+    jwt:
+      # Base64 of a 32-byte test-only value
+      secret: dGVzdC1vbmx5LWp3dC1zZWNyZXQtMzItYnl0ZXMtbG9uZyE=
+      ttl: 30m
+      issuer: payment-tokenization-system
