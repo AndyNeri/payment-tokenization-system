@@ -5,6 +5,12 @@ spring:
     port: 3025
 
 app:
+  tokenization:
+    rejection-probability: 0.0       # deterministic: rejection is covered by dedicated tests
+  crypto:
+    active-key-id: k1
+    keys:
+      k1: AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=   # test-only key (bytes 0..31)
   security:
     api-key: test-api-key-0123456789-abcdefghijklmnop
     jwt:
