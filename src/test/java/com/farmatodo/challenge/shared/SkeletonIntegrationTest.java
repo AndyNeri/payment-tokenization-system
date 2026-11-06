@@ -63,8 +63,11 @@ class SkeletonIntegrationTest {
 
         @Test
         void flywayMigrationsCreateSchemaAndSeedProducts() {
-            Integer products = jdbc.queryForObject("select count(*) from products", Integer.class);
-            assertThat(products).isEqualTo(40);
+            // Only the seeded catalog: other tests insert their own "TST-" products into the shared database,
+            // so counting the whole table would depend on test execution order.
+            Integer seeded = jdbc.queryForObject(
+                    "select count(*) from products where sku similar to '(MED|VIT|CUI|BEB|PRI)-[0-9]{4}'", Integer.class);
+            assertThat(seeded).isEqualTo(40);
         }
 
         @Test
