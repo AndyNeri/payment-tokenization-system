@@ -72,6 +72,12 @@ springdoc:
     path: /swagger-ui.html
 
 app:
+  tokenization:
+    rejection-probability: ${TOKENIZATION_REJECTION_PROBABILITY:0.1}
+  crypto:
+    active-key-id: ${CARD_ENCRYPTION_KEY_ID:k1}
+    keys:
+      k1: ${CARD_ENCRYPTION_KEY}     # Base64, 32 bytes (AES-256). Add k2, k3... to rotate keys
   security:
     api-key: ${API_KEY}
     jwt:
