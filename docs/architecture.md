@@ -40,7 +40,7 @@ El diagrama completo, con despliegue, protocolos y puertos, está en [`diagrams/
 
 ### Estructura de paquetes de un slice
 ```
-com.farmatodo.tokenization.<slice>
+com.farmatodo.challenge.<slice>
 ├── domain/                  ← Java puro: entidades, value objects, reglas, puertos de salida
 ├── application/             ← casos de uso (puertos de entrada) e implementación
 └── infrastructure/

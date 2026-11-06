@@ -20,7 +20,7 @@ docker compose up --build     # app + postgres + mailpit (UI correos: http://loc
 ```
 
 ## Arquitectura (reglas obligatorias)
-- Monolito modular **hexagonal** con **vertical slicing por feature**. Paquete base `com.farmatodo.tokenization`.
+- Monolito modular **hexagonal** con **vertical slicing por feature**. Paquete base `com.farmatodo.challenge`.
 - Slices: `shared`, `auth`, `tokenization`, `customer`, `product`, `cart`, `order`, `notification`, `audit`.
 - Cada slice tiene `domain/` → `application/` → `infrastructure/{in/web, out/<tecnología>}`.
 - `domain` **no importa** Spring, JPA ni `infrastructure` (ArchUnit lo verifica).
@@ -50,7 +50,7 @@ docker compose up --build     # app + postgres + mailpit (UI correos: http://loc
 
 ## Documentación
 - Si cambias una decisión de diseño, actualiza o agrega el ADR en `docs/decisions.md`.
-- Registra los prompts relevantes de cada sesión en `docs/ai-usage.md` (requisito de la entrega).
+- `docs/ai-usage.md` es la bitácora de uso de IA (requisito de la entrega).
 
 ## Git
 - El desarrollador hace los commits y push. Los agentes **no** ejecutan `git commit`, `git push` ni crean repos: solo sugieren commits (Conventional Commits con descripción en español: `feat:`, `fix:`, `docs:`, `test:`, `chore:`, `ci:`).
