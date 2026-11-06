@@ -1,0 +1,8 @@
+# Gitleaks configuration: default rules + an allowlist for test fixtures.
+# Test credentials under src/test are fake, test-only values (never used outside the test profile).
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Fake credentials used only by the test suite"
+paths = ['''^src/test/''']
