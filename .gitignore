@@ -1,0 +1,36 @@
+# Maven
+target/
+!.mvn/wrapper/maven-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+*.swp
+
+# OS
+.DS_Store
+
+# Secrets / local env
+.env
+*.env
+!.env.example
+*.pem
+*.key
+gcp-*.json
+service-account*.json
+
+# Logs
+*.log
+logs/
+
+# draw.io backups
+*.drawio.bkp
+.$*.drawio*
+
+# Material privado de preparación (no se sube)
+docs/defensa/
+CLAUDE.local.md
