@@ -1,0 +1,1754 @@
+{
+  "info": {
+    "_postman_id": "3cd99e50-f28c-5726-9b25-d5ba7701fa04",
+    "name": "Payment Tokenization System",
+    "description": "Colección de pruebas manuales y automatizadas (Newman) del reto técnico.\n\n**Uso:** importar la colección y el entorno (`local` o `gcp`), completar `apiKey` en el entorno y ejecutar la colección completa con el Runner (en orden). Cada request tiene pruebas automáticas.\n\nLas carpetas encadenan datos: el registro guarda `customerId`, el login guarda `accessToken` y la tokenización guarda `cardToken` para los requests siguientes.\n\nLa tokenización tiene un rechazo aleatorio configurable (422): esos requests reintentan solos hasta 5 veces.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Collection-level checks applied to every request",
+          "pm.test('Has X-Transaction-Id header (UUID)', () => {",
+          "  const id = pm.response.headers.get('X-Transaction-Id');",
+          "  pm.expect(id).to.match(/^[0-9a-f-]{36}$/);",
+          "});",
+          "pm.test('Response time < 3s', () => pm.expect(pm.response.responseTime).to.be.below(3000));"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "customerId",
+      "value": ""
+    },
+    {
+      "key": "email",
+      "value": ""
+    },
+    {
+      "key": "phone",
+      "value": ""
+    },
+    {
+      "key": "password",
+      "value": "S3gura!2026"
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    },
+    {
+      "key": "cardToken",
+      "value": ""
+    },
+    {
+      "key": "retryCount",
+      "value": "0"
+    },
+    {
+      "key": "productId",
+      "value": ""
+    },
+    {
+      "key": "productPrice",
+      "value": ""
+    },
+    {
+      "key": "scarceProductId",
+      "value": ""
+    },
+    {
+      "key": "scarceExceed",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "0. Health",
+      "item": [
+        {
+          "name": "Ping",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/ping",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ping"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Body is pong', () => pm.expect(pm.response.text()).to.eql('pong'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ping tokens API",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tokens/ping",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tokens",
+                "ping"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('pong', () => { pm.response.to.have.status(200); pm.expect(pm.response.text()).to.eql('pong'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ping customers API",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/customers/ping",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "customers",
+                "ping"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('pong', () => { pm.response.to.have.status(200); pm.expect(pm.response.text()).to.eql('pong'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/actuator/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "actuator",
+                "health"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status UP', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().status).to.eql('UP'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "1. Customers",
+      "item": [
+        {
+          "name": "Register customer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/customers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "customers"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Andrés\",\n  \"lastName\": \"Neri\",\n  \"email\": \"{{email}}\",\n  \"phone\": \"{{phone}}\",\n  \"address\": \"Av. Principal 123, Caracas\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Unique data per run so the collection can be executed many times",
+                  "const n = Date.now().toString().slice(-7);",
+                  "pm.collectionVariables.set('email', `andres.${n}@example.com`);",
+                  "pm.collectionVariables.set('phone', `+58412${n}`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "const b = pm.response.json();",
+                  "pm.test('Returns normalised customer without password', () => {",
+                  "  pm.expect(b.id).to.be.a('string');",
+                  "  pm.expect(b.email).to.eql(pm.collectionVariables.get('email'));",
+                  "  pm.expect(b).to.not.have.property('password');",
+                  "  pm.expect(b).to.not.have.property('passwordHash');",
+                  "});",
+                  "pm.collectionVariables.set('customerId', b.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register duplicate email (case-insensitive) → 409",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/customers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "customers"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Otra\",\n  \"lastName\": \"Persona\",\n  \"email\": \"{{upperEmail}}\",\n  \"phone\": \"+584149999999\",\n  \"address\": \"Calle 2, Valencia\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('upperEmail', pm.collectionVariables.get('email').toUpperCase());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 409', () => pm.response.to.have.status(409));",
+                  "pm.test('RFC 9457 ProblemDetail', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.code).to.eql('EMAIL_ALREADY_EXISTS');",
+                  "  pm.expect(b.status).to.eql(409);",
+                  "  pm.expect(b.transactionId).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register invalid data → 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/customers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "customers"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"\",\n  \"lastName\": \"Neri\",\n  \"email\": \"not-an-email\",\n  \"phone\": \"abc\",\n  \"address\": \"x\",\n  \"password\": \"weak\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('RFC 9457 ProblemDetail', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.code).to.eql('VALIDATION_ERROR');",
+                  "  pm.expect(b.status).to.eql(400);",
+                  "  pm.expect(b.transactionId).to.be.a('string');",
+                  "});",
+                  "pm.test('Field errors listed', () => {",
+                  "  const fields = pm.response.json().errors.map(e => e.field);",
+                  "  pm.expect(fields).to.include.members(['firstName', 'email', 'phone', 'address', 'password']);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Auth",
+      "item": [
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('Bearer token issued', () => {",
+                  "  pm.expect(b.tokenType).to.eql('Bearer');",
+                  "  pm.expect(b.accessToken.split('.')).to.have.length(3);",
+                  "  pm.expect(b.expiresIn).to.be.above(0);",
+                  "});",
+                  "pm.collectionVariables.set('accessToken', b.accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login wrong password → 401",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"Wrong!2026x\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));",
+                  "pm.test('RFC 9457 ProblemDetail', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.code).to.eql('INVALID_CREDENTIALS');",
+                  "  pm.expect(b.status).to.eql(401);",
+                  "  pm.expect(b.transactionId).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "My profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "me"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Profile of the logged-in customer', () => {",
+                  "  pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get('customerId'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "My profile without token → 401",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "me"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));",
+                  "pm.test('RFC 9457 ProblemDetail', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.code).to.eql('UNAUTHORIZED');",
+                  "  pm.expect(b.status).to.eql(401);",
+                  "  pm.expect(b.transactionId).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "My profile with invalid token → 401",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer eyJhbGciOiJIUzI1NiJ9.e30.invalid"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "me"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));",
+                  "pm.test('RFC 9457 ProblemDetail', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.code).to.eql('UNAUTHORIZED');",
+                  "  pm.expect(b.status).to.eql(401);",
+                  "  pm.expect(b.transactionId).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Tokenization",
+      "item": [
+        {
+          "name": "Tokenize VISA",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tokens",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tokens"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerId\": \"{{customerId}}\",\n  \"cardNumber\": \"4111 1111 1111 1111\",\n  \"cvv\": \"123\",\n  \"expirationMonth\": 12,\n  \"expirationYear\": 2030,\n  \"holderName\": \"Andrés Neri\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const attempts = Number(pm.collectionVariables.get('retryCount') || 0);",
+                  "if (pm.response.code === 422 && attempts < 5) {",
+                  "  pm.collectionVariables.set('retryCount', attempts + 1);",
+                  "  console.log(`Tokenization randomly rejected (422), retry ${attempts + 1}/5`);",
+                  "  if (pm.execution && pm.execution.setNextRequest) {",
+                  "    pm.execution.setNextRequest('Tokenize VISA');",
+                  "  } else {",
+                  "    postman.setNextRequest('Tokenize VISA');",
+                  "  }",
+                  "} else {",
+                  "  pm.collectionVariables.set('retryCount', 0);",
+                  "  pm.test('Status 201 (after ' + attempts + ' random rejections)', () => pm.response.to.have.status(201));",
+                  "  const b = pm.response.json();",
+                  "  pm.test('Token issued, card masked', () => {",
+                  "    pm.expect(b.token).to.match(/^tok_[A-Za-z0-9_-]{32}$/);",
+                  "    pm.expect(b.brand).to.eql('VISA');",
+                  "    pm.expect(b.last4).to.eql('1111');",
+                  "  });",
+                  "  pm.test('No PAN or CVV in the response', () => {",
+                  "    pm.expect(pm.response.text()).to.not.include('4111111111111111');",
+                  "    pm.expect(b).to.not.have.property('cvv');",
+                  "  });",
+                  "  pm.collectionVariables.set('cardToken', b.token);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Tokenize AMEX (4-digit CVV)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tokens",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tokens"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerId\": \"{{customerId}}\",\n  \"cardNumber\": \"378282246310005\",\n  \"cvv\": \"1234\",\n  \"expirationMonth\": 6,\n  \"expirationYear\": 2031,\n  \"holderName\": \"Andrés Neri\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const attempts = Number(pm.collectionVariables.get('retryCount') || 0);",
+                  "if (pm.response.code === 422 && attempts < 5) {",
+                  "  pm.collectionVariables.set('retryCount', attempts + 1);",
+                  "  console.log(`Tokenization randomly rejected (422), retry ${attempts + 1}/5`);",
+                  "  if (pm.execution && pm.execution.setNextRequest) {",
+                  "    pm.execution.setNextRequest('Tokenize AMEX (4-digit CVV)');",
+                  "  } else {",
+                  "    postman.setNextRequest('Tokenize AMEX (4-digit CVV)');",
+                  "  }",
+                  "} else {",
+                  "  pm.collectionVariables.set('retryCount', 0);",
+                  "  pm.test('Status 201 (after ' + attempts + ' random rejections)', () => pm.response.to.have.status(201));",
+                  "  pm.test('AMEX detected', () => pm.expect(pm.response.json().brand).to.eql('AMEX'));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Tokenize invalid card → 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tokens",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tokens"
+              ]
+            },
+            "description": "Luhn inválido + CVV de 4 dígitos en una VISA: se reportan ambos errores juntos.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerId\": \"{{customerId}}\",\n  \"cardNumber\": \"4111111111111112\",\n  \"cvv\": \"1234\",\n  \"expirationMonth\": 12,\n  \"expirationYear\": 2030,\n  \"holderName\": \"Andrés Neri\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('RFC 9457 ProblemDetail', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.code).to.eql('INVALID_CARD');",
+                  "  pm.expect(b.status).to.eql(400);",
+                  "  pm.expect(b.transactionId).to.be.a('string');",
+                  "});",
+                  "pm.test('Both errors reported', () => {",
+                  "  pm.expect(pm.response.json().errors.map(e => e.field)).to.eql(['cardNumber', 'cvv']);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Tokenize expired card → 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tokens",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tokens"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerId\": \"{{customerId}}\",\n  \"cardNumber\": \"4111 1111 1111 1111\",\n  \"cvv\": \"123\",\n  \"expirationMonth\": 1,\n  \"expirationYear\": 2020,\n  \"holderName\": \"Andrés Neri\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('RFC 9457 ProblemDetail', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.code).to.eql('INVALID_CARD');",
+                  "  pm.expect(b.status).to.eql(400);",
+                  "  pm.expect(b.transactionId).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Tokenize unknown customer → 404",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tokens",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tokens"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerId\": \"00000000-0000-7000-8000-000000000000\",\n  \"cardNumber\": \"4111 1111 1111 1111\",\n  \"cvv\": \"123\",\n  \"expirationMonth\": 12,\n  \"expirationYear\": 2030,\n  \"holderName\": \"Andrés Neri\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));",
+                  "pm.test('RFC 9457 ProblemDetail', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.code).to.eql('CUSTOMER_NOT_FOUND');",
+                  "  pm.expect(b.status).to.eql(404);",
+                  "  pm.expect(b.transactionId).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Tokenize without API key → 401",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tokens",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tokens"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerId\": \"{{customerId}}\",\n  \"cardNumber\": \"4111 1111 1111 1111\",\n  \"cvv\": \"123\",\n  \"expirationMonth\": 12,\n  \"expirationYear\": 2030,\n  \"holderName\": \"Andrés Neri\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));",
+                  "pm.test('RFC 9457 ProblemDetail', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.code).to.eql('INVALID_API_KEY');",
+                  "  pm.expect(b.status).to.eql(401);",
+                  "  pm.expect(b.transactionId).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Tokenize with JWT instead of API key → 401",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tokens",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tokens"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerId\": \"{{customerId}}\",\n  \"cardNumber\": \"4111 1111 1111 1111\",\n  \"cvv\": \"123\",\n  \"expirationMonth\": 12,\n  \"expirationYear\": 2030,\n  \"holderName\": \"Andrés Neri\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));",
+                  "pm.test('RFC 9457 ProblemDetail', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.code).to.eql('INVALID_API_KEY');",
+                  "  pm.expect(b.status).to.eql(401);",
+                  "  pm.expect(b.transactionId).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "My cards",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/me/cards",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "me",
+                "cards"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const cards = pm.response.json();",
+                  "pm.test('Contains the tokenized cards, masked', () => {",
+                  "  pm.expect(cards.map(c => c.token)).to.include(pm.collectionVariables.get('cardToken'));",
+                  "  pm.expect(cards.map(c => c.brand)).to.include.members(['VISA', 'AMEX']);",
+                  "  cards.forEach(c => pm.expect(Object.keys(c)).to.have.members(['token', 'brand', 'last4', 'createdAt']));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. Products",
+      "item": [
+        {
+          "name": "Search products",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/products?q=ibuprofeno",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "products"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "ibuprofeno"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('Matches by name, case-insensitive, only products with stock', () => {",
+                  "  pm.expect(b.totalElements).to.be.above(0);",
+                  "  b.content.forEach(p => {",
+                  "    pm.expect(p.name.toLowerCase()).to.include('ibuprofeno');",
+                  "    pm.expect(p.stock).to.be.above(0);",
+                  "  });",
+                  "});",
+                  "// Save the best-stocked product for the cart, and the scarcest one to provoke a 409",
+                  "const byStock = [...b.content].sort((a, c) => a.stock - c.stock);",
+                  "pm.collectionVariables.set('productId', byStock[byStock.length - 1].id);",
+                  "pm.collectionVariables.set('productPrice', byStock[byStock.length - 1].price);",
+                  "pm.collectionVariables.set('scarceProductId', byStock[0].id);",
+                  "pm.collectionVariables.set('scarceExceed', byStock[0].stock + 1);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Search all, paginated",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/products?page=0&size=5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "products"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "5"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('Page metadata and size respected', () => {",
+                  "  pm.expect(b.content).to.have.length(5);",
+                  "  pm.expect(b.page).to.eql(0);",
+                  "  pm.expect(b.size).to.eql(5);",
+                  "  pm.expect(b.totalPages).to.be.at.least(1);",
+                  "});",
+                  "pm.test('Sorted by name', () => {",
+                  "  const names = b.content.map(p => p.name);",
+                  "  pm.expect(names).to.eql([...names].sort((x, y) => x.localeCompare(y)));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Search with '%' matches it literally",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/products?q=%25",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "products"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "%25"
+                }
+              ]
+            },
+            "description": "El texto del usuario se busca literal: '%' no es un comodín (no devuelve todo el catálogo)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Only products that contain a literal %', () => {",
+                  "  pm.response.json().content.forEach(p =>",
+                  "    pm.expect(p.name + ' ' + (p.description || '')).to.include('%'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Search with invalid page size → 400",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/products?size=500",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "products"
+              ],
+              "query": [
+                {
+                  "key": "size",
+                  "value": "500"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('RFC 9457 ProblemDetail', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.code).to.eql('VALIDATION_ERROR');",
+                  "  pm.expect(b.status).to.eql(400);",
+                  "  pm.expect(b.transactionId).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Search without token → 401",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/products?q=ibuprofeno",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "products"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "ibuprofeno"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));",
+                  "pm.test('RFC 9457 ProblemDetail', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.code).to.eql('UNAUTHORIZED');",
+                  "  pm.expect(b.status).to.eql(401);",
+                  "  pm.expect(b.transactionId).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5. Cart",
+      "item": [
+        {
+          "name": "View empty cart",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/me/cart",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "me",
+                "cart"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('New customer has an empty cart', () => {",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.items).to.eql([]);",
+                  "  pm.expect(b.total).to.eql(0);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Add product to cart",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/me/cart/items",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "me",
+                "cart",
+                "items"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": \"{{productId}}\",\n  \"quantity\": 2\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "const price = Number(pm.collectionVariables.get('productPrice'));",
+                  "pm.test('One line, priced with the catalog price', () => {",
+                  "  pm.expect(b.items).to.have.length(1);",
+                  "  pm.expect(b.items[0].quantity).to.eql(2);",
+                  "  pm.expect(b.items[0].subtotal).to.be.closeTo(price * 2, 0.001);",
+                  "  pm.expect(b.total).to.be.closeTo(price * 2, 0.001);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Add same product again (quantities merge)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/me/cart/items",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "me",
+                "cart",
+                "items"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": \"{{productId}}\",\n  \"quantity\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Still one line, quantity 3', () => {",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.items).to.have.length(1);",
+                  "  pm.expect(b.items[0].quantity).to.eql(3);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Add more than available stock → 409",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/me/cart/items",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "me",
+                "cart",
+                "items"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": \"{{scarceProductId}}\",\n  \"quantity\": {{exceed}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// numeric body value built from the scarcest product found in the search",
+                  "pm.variables.set('exceed', Number(pm.collectionVariables.get('scarceExceed')));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 409', () => pm.response.to.have.status(409));",
+                  "pm.test('RFC 9457 ProblemDetail', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.code).to.eql('INSUFFICIENT_STOCK');",
+                  "  pm.expect(b.status).to.eql(409);",
+                  "  pm.expect(b.transactionId).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Add unknown product → 404",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/me/cart/items",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "me",
+                "cart",
+                "items"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": \"00000000-0000-7000-8000-000000000000\",\n  \"quantity\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));",
+                  "pm.test('RFC 9457 ProblemDetail', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.code).to.eql('PRODUCT_NOT_FOUND');",
+                  "  pm.expect(b.status).to.eql(404);",
+                  "  pm.expect(b.transactionId).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Add invalid quantity → 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/me/cart/items",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "me",
+                "cart",
+                "items"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": \"{{productId}}\",\n  \"quantity\": 0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('RFC 9457 ProblemDetail', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.code).to.eql('VALIDATION_ERROR');",
+                  "  pm.expect(b.status).to.eql(400);",
+                  "  pm.expect(b.transactionId).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Remove product from cart",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/me/cart/items/{{productId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "me",
+                "cart",
+                "items",
+                "{{productId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Cart is empty again', () => pm.expect(pm.response.json().items).to.eql([]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Remove product not in cart → 404",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/me/cart/items/{{productId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "me",
+                "cart",
+                "items",
+                "{{productId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));",
+                  "pm.test('RFC 9457 ProblemDetail', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.code).to.eql('CART_ITEM_NOT_FOUND');",
+                  "  pm.expect(b.status).to.eql(404);",
+                  "  pm.expect(b.transactionId).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Add product again (cart ready for checkout)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/me/cart/items",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "me",
+                "cart",
+                "items"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": \"{{productId}}\",\n  \"quantity\": 2\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,13 +1,19 @@
 package com.farmatodo.challenge.shared.security;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
 
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2TokenValidator;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
@@ -28,14 +34,21 @@ class JwtConfig {
         return new SecretKeySpec(properties.jwt().secretBytes(), "HmacSHA256");
     }
 
+    /**
+     * Validators: expiration/not-before (with clock skew) + issuer, plus any extra {@code OAuth2TokenValidator<Jwt>}
+     * beans contributed by other modules (e.g. auth checks that the customer still exists). Collecting them by
+     * type keeps shared free of dependencies on business modules.
+     */
     @Bean
-    JwtDecoder jwtDecoder(SecretKey jwtSecretKey, SecurityProperties properties) {
+    JwtDecoder jwtDecoder(SecretKey jwtSecretKey, SecurityProperties properties,
+            ObjectProvider<OAuth2TokenValidator<Jwt>> extraValidators) {
         NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(jwtSecretKey)
                 .macAlgorithm(MacAlgorithm.HS256)
                 .build();
-        // Validates expiration/not-before (with clock skew) and that the token was issued by this service.
-        decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
-                JwtValidators.createDefaultWithIssuer(properties.jwt().issuer())));
+        List<OAuth2TokenValidator<Jwt>> validators = new ArrayList<>();
+        validators.add(JwtValidators.createDefaultWithIssuer(properties.jwt().issuer()));
+        extraValidators.orderedStream().forEach(validators::add);
+        decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(validators));
         return decoder;
     }
 

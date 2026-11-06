@@ -69,6 +69,58 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  api-tests:
+    name: API tests (Postman / Newman)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: build-test
+    steps:
+      - uses: actions/checkout@v7
+
+      # Throw-away secrets for this run only (never stored anywhere)
+      - name: Create .env with random secrets
+        run: |
+          sed -e "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=$(openssl rand -hex 16)|" \
+              -e "s|^API_KEY=.*|API_KEY=$(openssl rand -hex 32)|" \
+              -e "s|^JWT_SECRET=.*|JWT_SECRET=$(openssl rand -base64 32)|" \
+              -e "s|^CARD_ENCRYPTION_KEY=.*|CARD_ENCRYPTION_KEY=$(openssl rand -base64 32)|" \
+              .env.example > .env
+          echo "::add-mask::$(grep '^API_KEY=' .env | cut -d= -f2)"
+
+      - name: Start stack (app + postgres + mailpit)
+        run: docker compose up --build -d
+
+      - name: Wait for the API
+        run: |
+          for i in $(seq 1 60); do
+            curl -sf http://localhost:8080/ping && exit 0
+            sleep 2
+          done
+          docker compose logs app
+          exit 1
+
+      - name: Run Postman collection
+        run: |
+          npx -y newman@6 run postman/payment-tokenization.postman_collection.json \
+            -e postman/local.postman_environment.json \
+            --env-var "apiKey=$(grep '^API_KEY=' .env | cut -d= -f2)" \
+            --reporters cli,junit --reporter-junit-export target/newman/results.xml
+
+      - name: App logs on failure
+        if: failure()
+        run: docker compose logs app
+
+      - name: Upload Newman report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: newman-report
+          path: target/newman/
+
+      - name: Stop stack
+        if: always()
+        run: docker compose down -v
+
   docker-build:
     name: Docker image builds
     runs-on: ubuntu-latest

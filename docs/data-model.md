@@ -16,7 +16,6 @@ erDiagram
     ORDERS ||--|{ ORDER_ITEMS : "incluye"
     PRODUCTS ||--o{ ORDER_ITEMS : "en"
     ORDERS ||--|{ PAYMENT_ATTEMPTS : "registra"
-    CUSTOMERS |o--o{ SEARCH_LOGS : "busca"
 
     CUSTOMERS {
         uuid id PK
@@ -145,12 +144,14 @@ erDiagram
 | description | text | |
 | price | numeric(12,2) | CHECK > 0 |
 | stock | int | CHECK ≥ 0 |
-| version | bigint | bloqueo optimista (`@Version`) |
+| version | bigint | se incrementa en cada cambio de stock (`@Version`); el descuento usa un `UPDATE` atómico condicional (ADR-011) |
 
 Índice parcial opcional: `(stock)`, para el filtro `stock > :minStock`.
 
 ### `search_logs` — slice `product` (escritura asíncrona)
-`id`, `query`, `results_count`, `customer_id` (nullable), `transaction_id`, `created_at`. Índice en `created_at`.
+`id`, `query`, `results_count`, `customer_id` (nullable, **sin FK** desde V4), `transaction_id`, `created_at`. Índices en `created_at` y `customer_id`.
+
+> Es un log *append-only*, como `audit_events`: escribir un log nunca debe fallar porque la entidad referenciada cambió o desapareció. La FK original se eliminó en `V4__search_logs_without_customer_fk.sql`.
 
 ### `carts` / `cart_items` — slice `cart`
 - `carts.customer_id` es **UNIQUE**: un carrito activo por cliente.
@@ -177,4 +178,5 @@ erDiagram
 |---|---|
 | `V1__init_schema.sql` | Todas las tablas, constraints e índices + extensión `pg_trgm` |
 | `V2__event_publication.sql` | Tabla del Event Publication Registry de Spring Modulith |
-| `V3__seed_products.sql` | ~40 productos de farmacia (algunos con stock 0–2 para demostrar el filtro de stock mínimo) |
+| `V3__seed_products.sql` | ~40 productos de farmacia (algunos con stock 0–3 para demostrar el filtro de stock mínimo) |
+| `V4__search_logs_without_customer_fk.sql` | Quita la FK de `search_logs.customer_id` (log append-only) |

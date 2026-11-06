@@ -63,8 +63,11 @@ class SkeletonIntegrationTest {
 
         @Test
         void flywayMigrationsCreateSchemaAndSeedProducts() {
-            Integer products = jdbc.queryForObject("select count(*) from products", Integer.class);
-            assertThat(products).isEqualTo(40);
+            // Only the seeded catalog: other tests insert their own "TST-" products into the shared database,
+            // so counting the whole table would depend on test execution order.
+            Integer seeded = jdbc.queryForObject(
+                    "select count(*) from products where sku similar to '(MED|VIT|CUI|BEB|PRI)-[0-9]{4}'", Integer.class);
+            assertThat(seeded).isEqualTo(40);
         }
 
         @Test
@@ -157,20 +160,38 @@ class SkeletonIntegrationTest {
 
         @Test
         void acceptsValidTokenAndReturnsProblemDetailForUnknownRoute() {
+            UUID customer = com.farmatodo.challenge.TestData.insertCustomer(jdbc);
             var result = mvc.get().uri("/api/v1/does-not-exist")
-                    .header("Authorization", "Bearer " + token(Duration.ofMinutes(5)));
+                    .header("Authorization", "Bearer " + token(customer, Duration.ofMinutes(5)));
             assertThat(result).hasStatus(HttpStatus.NOT_FOUND)
                     .hasContentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON);
             assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("NOT_FOUND");
             assertThat(result).bodyJson().extractingPath("$.transactionId").isNotNull();
         }
+
+        @Test
+        void rejectsValidlySignedTokenWhoseCustomerNoLongerExists() {
+            UUID customer = com.farmatodo.challenge.TestData.insertCustomer(jdbc);
+            String token = token(customer, Duration.ofMinutes(5));
+            assertThat(mvc.get().uri("/api/v1/me").header("Authorization", "Bearer " + token)).hasStatusOk();
+
+            jdbc.update("delete from customers where id = ?", customer);
+
+            var result = mvc.get().uri("/api/v1/me").header("Authorization", "Bearer " + token);
+            assertThat(result).hasStatus(HttpStatus.UNAUTHORIZED);
+            assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("UNAUTHORIZED");
+        }
     }
 
     private String token(Duration validity) {
+        return token(UUID.randomUUID(), validity);
+    }
+
+    private String token(UUID subject, Duration validity) {
         Instant now = Instant.now();
         JwtClaimsSet claims = JwtClaimsSet.builder()
                 .issuer(ISSUER)
-                .subject(UUID.randomUUID().toString())
+                .subject(subject.toString())
                 .issuedAt(now.minus(Duration.ofMinutes(10)))
                 .expiresAt(now.plus(validity))
                 .build();

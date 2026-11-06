@@ -64,8 +64,32 @@ export JAVA_HOME=$(/usr/libexec/java_home -v 25)   # macOS: si tu JDK por defect
 | Cobertura | `target/site/jacoco/index.html` |
 | Diagramas de módulos (PlantUML) | `target/spring-modulith-docs/` |
 
-## Colección Postman _(pendiente)_
-`postman/` — instrucciones para importarla y ejecutarla con Newman.
+## Colección Postman
+
+| Archivo | Contenido |
+|---|---|
+| `postman/payment-tokenization.postman_collection.json` | 34 requests en 6 carpetas (Health, Customers, Auth, Tokenization, Products, Cart), con 136 aserciones automáticas |
+| `postman/local.postman_environment.json` | `baseUrl = http://localhost:8080` |
+| `postman/gcp.postman_environment.json` | `baseUrl` = URL de Cloud Run |
+
+**Uso manual (Postman):** importa la colección y un entorno, completa la variable `apiKey` (es de tipo *secret*) y ejecuta la colección completa con el **Runner**, en orden. Los requests encadenan datos: el registro guarda `customerId`, el login guarda `accessToken` y la tokenización guarda `cardToken`.
+
+**Uso automatizado (Newman):**
+```bash
+npx newman run postman/payment-tokenization.postman_collection.json \
+  -e postman/local.postman_environment.json \
+  --env-var "apiKey=$(grep '^API_KEY=' .env | cut -d= -f2)"
+```
+
+Qué validan las pruebas:
+- Status y cuerpo de cada respuesta.
+- Formato RFC 9457 en los errores (`code`, `transactionId`).
+- Header `X-Transaction-Id` y tiempo de respuesta en todos los requests.
+- Que el PAN y el CVV nunca aparezcan en las respuestas.
+
+La tokenización tiene un rechazo aleatorio configurable (422). Esos requests **reintentan solos hasta 5 veces**, como lo haría un cliente real, así que la colección es estable con cualquier probabilidad razonable.
+
+En el **CI**, el job `API tests` levanta el stack con `docker compose` (con secretos aleatorios de un solo uso) y ejecuta la colección con Newman en cada push y PR.
 
 ## Despliegue en GCP desde cero _(pendiente)_
 
@@ -73,6 +97,7 @@ export JAVA_HOME=$(/usr/libexec/java_home -v 25)   # macOS: si tu JDK por defect
 **CI** (`.github/workflows/ci.yml`), en cada push y pull request:
 1. **Build y pruebas:** `./mvnw verify` (pruebas, reglas de arquitectura y umbral de cobertura). Publica el resumen de cobertura y los reportes como artefactos.
 2. **Escaneo de secretos:** Gitleaks sobre todo el historial.
-3. **Build de la imagen Docker.**
+3. **Pruebas de API:** el stack completo con Docker Compose + la colección Postman con Newman (reporte JUnit como artefacto).
+4. **Build de la imagen Docker.**
 
 **CD** _(pendiente)_: despliegue en Cloud Run.
