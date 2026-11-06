@@ -296,7 +296,7 @@ Content-Type: application/problem+json
 | 404 | `CUSTOMER_NOT_FOUND`, `PRODUCT_NOT_FOUND`, `CARD_NOT_FOUND`, `ORDER_NOT_FOUND`, `CART_ITEM_NOT_FOUND` | El recurso no existe o no pertenece al cliente |
 | 409 | `EMAIL_ALREADY_EXISTS`, `PHONE_ALREADY_EXISTS` | Datos duplicados al registrar |
 | 409 | `INSUFFICIENT_STOCK` | No hay stock suficiente (al agregar al carrito o en el checkout) |
-| 409 | `CONCURRENT_MODIFICATION` | Conflicto de bloqueo optimista que no se resolvió tras reintentar |
+| 409 | `CONCURRENT_MODIFICATION` | Conflicto de concurrencia inesperado (salvaguarda genérica) |
 | 422 | `TOKENIZATION_REJECTED` | Rechazo simulado de la tokenización |
 | 500 | `INTERNAL_ERROR` | Error inesperado (mensaje genérico; el detalle solo va al log con el `transactionId`) |
 

@@ -146,3 +146,21 @@ Formato corto: **Contexto → Decisión → Alternativas → Consecuencias**.
 **Alternativas.** GKE (excesivo); Compute Engine (más operación); App Engine (menos portable).
 
 **Consecuencias.** Hay arranques en frío (se mitigan con la caché AOT y `min-instances` opcional). Las conexiones a Cloud SQL se limitan con el tamaño del pool y `max-instances`.
+
+---
+
+## ADR-011 · Descuento de stock con `UPDATE` atómico condicional (reemplaza el bloqueo optimista)
+
+**Contexto.** El diseño inicial usaba bloqueo optimista (`@Version`) para descontar stock: leer, verificar, escribir, y reintentar si hay conflicto.
+
+**Decisión.** Cada línea se descuenta con `UPDATE products SET stock = stock - :q, version = version + 1 WHERE id = :id AND stock >= :q`. Si afecta 0 filas, no hay stock → 409 `INSUFFICIENT_STOCK`. Las líneas se procesan **ordenadas por id** y dentro de la transacción del llamador (`Propagation.MANDATORY`), así la reserva es todo o nada.
+
+**Razones.**
+- **Una sola sentencia atómica**: PostgreSQL bloquea la fila durante el UPDATE y reevalúa la condición, así que es imposible vender de más, sin leer antes y sin reintentos.
+- El `CHECK (stock >= 0)` de la tabla queda como red de seguridad adicional.
+- Con bloqueo optimista, una oferta con mucha demanda generaría muchos conflictos y reintentos; aquí cada comprador recibe la respuesta en un solo viaje a la BD.
+- El orden fijo por id evita *deadlocks* cuando dos pedidos comparten productos.
+
+**Evidencia.** Prueba de integración: 20 compras concurrentes sobre un producto con stock 5 → exactamente 5 exitosas y stock final 0.
+
+**Consecuencias.** La columna `version` se sigue incrementando para que cualquier escritura vía JPA detecte cambios concurrentes. El carrito **no reserva** stock: solo lo valida al agregar; la reserva ocurre en el checkout.

@@ -71,7 +71,7 @@ com.farmatodo.challenge.<slice>
 | cart | `CartUseCase` | `CartRepository`, `ProductCatalog` | JPA / API de `product` |
 | order | `PlaceOrderUseCase`, `GetOrderUseCase` | `OrderRepository` | JPA |
 | | | `PaymentGateway` | `SimulatedPaymentGateway` (probabilidad) |
-| | | `StockReservation` | API de `product` (bloqueo optimista) |
+| | | `ProductInventory` | API de `product` (`UPDATE` atómico condicional) |
 | notification | (listener de eventos) | `EmailSender` | `SmtpEmailSender` (Spring Mail) |
 | audit | `AuditLog` (API pública) | `AuditRepository` | JPA |
 
@@ -93,7 +93,7 @@ com.farmatodo.challenge.<slice>
 | Mecanismo | Dónde | Detalle |
 |---|---|---|
 | **API Key** (`X-API-Key`) | `POST /api/v1/tokens`, `GET /api/v1/audit` | Integraciones *machine-to-machine*. La llave viene de Secret Manager o del entorno y se compara en tiempo constante (`MessageDigest.isEqual`) para evitar ataques de tiempo. |
-| **JWT** (Bearer) | Endpoints de cliente (`/me/**`, `/products`, `/orders`) | Spring Security OAuth2 Resource Server. HS256 con secreto de 256 bits, expiración de 30 min. `sub` = customerId. |
+| **JWT** (Bearer) | Endpoints de cliente (`/me/**`, `/products`, `/orders`) | Spring Security OAuth2 Resource Server. HS256 con secreto de 256 bits, expiración de 30 min. `sub` = customerId. Además de firma, expiración e issuer, se valida que **el cliente siga existiendo** (`CustomerExistsJwtValidator`): un token de un cliente borrado responde 401 de inmediato (revocación). |
 | **Rutas `/me`** | carrito, tarjetas, perfil | El id del cliente sale del token y no de la URL → evita IDOR. |
 | **BCrypt** | contraseñas | Vía `DelegatingPasswordEncoder` (permite migrar a Argon2). |
 | **AES-256-GCM** | datos de tarjeta | Ver abajo. |
@@ -148,7 +148,7 @@ Por cada operación se genera `r ∈ [0, 1)` y **se rechaza si `r < p`**. Así `
 
 - **Stateless**: JWT sin sesión en servidor, así que Cloud Run escala horizontalmente sin sticky sessions.
 - **Hilos virtuales** (Java 25, sin *pinning* en `synchronized`): conviene porque la carga es casi toda de I/O (BD, SMTP).
-- **Stock**: bloqueo optimista con `@Version` al descontar. Si dos checkouts compiten por la última unidad, uno gana y el otro recibe 409 `OUT_OF_STOCK`.
+- **Stock**: se descuenta con un `UPDATE products SET stock = stock - :q WHERE id = :id AND stock >= :q` atómico (ADR-011). La BD serializa las escrituras sobre la fila: si dos checkouts compiten por la última unidad, uno actualiza 1 fila y el otro 0, y recibe 409 `INSUFFICIENT_STOCK`. Sin reintentos y sin stock negativo. Las filas se actualizan ordenadas por id para evitar deadlocks.
 - **Pool de conexiones**: HikariCP con un tamaño acotado. `max_connections` de Cloud SQL ≥ `instancias_max × pool_size`; con eso se elige el `max-instances` de Cloud Run.
 - **Trabajo asíncrono** (logs de búsqueda, emails, auditoría) fuera del camino crítico del request.
 - Índices en las columnas de búsqueda y en las FK (ver [data-model.md](data-model.md)).

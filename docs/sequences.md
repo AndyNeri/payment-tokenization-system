@@ -119,7 +119,7 @@ sequenceDiagram
     alt no existe o es de otro cliente
         U-->>Cl: 404 CARD_NOT_FOUND
     end
-    U->>St: reserve(items)  [@Version optimista]
+    U->>St: reserve(items)  [UPDATE atómico condicional]
     alt sin stock
         U-->>Cl: 409 INSUFFICIENT_STOCK
     end
@@ -154,4 +154,4 @@ sequenceDiagram
 - **T1:** reservar stock + crear la orden `PENDING_PAYMENT`. El commit ocurre antes de cobrar, así la orden existe aunque la app se caiga a mitad del pago.
 - **T2 (por intento):** guardar `payment_attempt`. Cada intento queda registrado aunque los siguientes fallen.
 - **T3:** estado final + vaciar el carrito o liberar el stock + publicar el evento (que se guarda en `event_publication` en la misma transacción, patrón outbox).
-- Si el bloqueo optimista falla al reservar, se reintenta unas pocas veces antes de responder `409 CONCURRENT_MODIFICATION`.
+- La reserva de stock es un `UPDATE ... WHERE stock >= :q` por producto, dentro de T1: si un producto no alcanza, toda la reserva hace rollback y se responde `409 INSUFFICIENT_STOCK`.
