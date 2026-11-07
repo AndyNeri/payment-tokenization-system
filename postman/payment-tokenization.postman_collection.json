@@ -666,6 +666,7 @@
                   "    pm.expect(b).to.not.have.property('cvv');",
                   "  });",
                   "  pm.collectionVariables.set('cardToken', b.token);",
+                  "  pm.collectionVariables.set('tokenizeTx', pm.response.headers.get('X-Transaction-Id'));",
                   "}"
                 ]
               }
@@ -1864,6 +1865,8 @@
                   "const b = pm.response.json();",
                   "pm.collectionVariables.set('orderId', b.id);",
                   "pm.collectionVariables.set('orderStatus', b.status);",
+                  "pm.collectionVariables.set('orderAttempts', b.paymentAttempts.length);",
+                  "pm.collectionVariables.set('checkoutTx', pm.response.headers.get('X-Transaction-Id'));",
                   "pm.test('Order snapshot: items, total, masked card, delivery address', () => {",
                   "  pm.expect(b.items).to.have.length.above(0);",
                   "  const sum = b.items.reduce((acc, i) => acc + i.subtotal, 0);",
@@ -2090,6 +2093,382 @@
                   "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
                   "  const b = pm.response.json();",
                   "  pm.expect(b.code).to.eql('UNAUTHORIZED');",
+                  "  pm.expect(b.status).to.eql(401);",
+                  "  pm.expect(b.transactionId).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "7. Audit",
+      "item": [
+        {
+          "name": "Audit trail of the tokenization",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/audit?transactionId={{tokenizeTx}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "audit"
+              ],
+              "query": [
+                {
+                  "key": "transactionId",
+                  "value": "{{tokenizeTx}}"
+                }
+              ]
+            },
+            "description": "Bitácora centralizada: todo lo que pasó dentro de un transactionId (header X-Transaction-Id). Se escribe de forma asíncrona, por eso la petición espera y reintenta."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "setTimeout(() => {}, 1000);   // async listeners: give them a moment"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const entries = pm.response.json();",
+                  "const types = entries.map(e => e.eventType);",
+                  "const required = [\"CARD_TOKENIZED\"];",
+                  "const polls = Number(pm.collectionVariables.get('auditPolls') || 0);",
+                  "if (!required.every(t => types.includes(t)) && polls < 8) {",
+                  "  pm.collectionVariables.set('auditPolls', polls + 1);",
+                  "  console.log(`Audit not complete yet (${types.join(', ')}), poll ${polls + 1}/8`);",
+                  "  if (pm.execution && pm.execution.setNextRequest) {",
+                  "    pm.execution.setNextRequest('Audit trail of the tokenization');",
+                  "  } else {",
+                  "    postman.setNextRequest('Audit trail of the tokenization');",
+                  "  }",
+                  "} else {",
+                  "  pm.collectionVariables.set('auditPolls', 0);",
+                  "  pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "  pm.test('CARD_TOKENIZED under the same transactionId, masked data only', () => {",
+                  "    const e = entries.find(x => x.eventType === 'CARD_TOKENIZED');",
+                  "    pm.expect(e.transactionId).to.eql(pm.collectionVariables.get('tokenizeTx'));",
+                  "    pm.expect(e.outcome).to.eql('SUCCESS');",
+                  "    pm.expect(e.details.last4).to.eql('1111');",
+                  "    pm.expect(pm.response.text()).to.not.include('4111111111111111');",
+                  "    pm.expect(pm.response.text().toLowerCase()).to.not.include('cvv');",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Audit trail of the checkout",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/audit?transactionId={{checkoutTx}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "audit"
+              ],
+              "query": [
+                {
+                  "key": "transactionId",
+                  "value": "{{checkoutTx}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "setTimeout(() => {}, 1000);   // async listeners: give them a moment"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const entries = pm.response.json();",
+                  "const types = entries.map(e => e.eventType);",
+                  "const required = [\"ORDER_PLACED\", \"PAYMENT_ATTEMPTED\", \"EMAIL_SENT\"];",
+                  "const polls = Number(pm.collectionVariables.get('auditPolls') || 0);",
+                  "if (!required.every(t => types.includes(t)) && polls < 8) {",
+                  "  pm.collectionVariables.set('auditPolls', polls + 1);",
+                  "  console.log(`Audit not complete yet (${types.join(', ')}), poll ${polls + 1}/8`);",
+                  "  if (pm.execution && pm.execution.setNextRequest) {",
+                  "    pm.execution.setNextRequest('Audit trail of the checkout');",
+                  "  } else {",
+                  "    postman.setNextRequest('Audit trail of the checkout');",
+                  "  }",
+                  "} else {",
+                  "  pm.collectionVariables.set('auditPolls', 0);",
+                  "  pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "  const paid = pm.collectionVariables.get('orderStatus') === 'PAID';",
+                  "  pm.test('The whole checkout story under one transactionId', () => {",
+                  "    entries.forEach(e => pm.expect(e.transactionId).to.eql(pm.collectionVariables.get('checkoutTx')));",
+                  "    pm.expect(types).to.include('ORDER_PLACED');",
+                  "    pm.expect(types).to.include(paid ? 'PAYMENT_SUCCEEDED' : 'PAYMENT_FAILED');",
+                  "  });",
+                  "  pm.test('One PAYMENT_ATTEMPTED per attempt', () => {",
+                  "    const attempts = types.filter(t => t === 'PAYMENT_ATTEMPTED').length;",
+                  "    pm.expect(attempts).to.eql(Number(pm.collectionVariables.get('orderAttempts')));",
+                  "  });",
+                  "  pm.test('The customer was emailed with the right template', () => {",
+                  "    const email = entries.find(x => x.eventType === 'EMAIL_SENT');",
+                  "    pm.expect(email.details.type).to.eql(paid ? 'PAYMENT_SUCCEEDED_EMAIL' : 'PAYMENT_FAILED_EMAIL');",
+                  "    pm.expect(pm.response.text()).to.not.include('@');   // no email addresses in the audit trail",
+                  "  });",
+                  "  console.log(`Audit: ${types.join(' → ')}`);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Audit with unknown transactionId → empty list",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/audit?transactionId=00000000-0000-7000-8000-000000000000",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "audit"
+              ],
+              "query": [
+                {
+                  "key": "transactionId",
+                  "value": "00000000-0000-7000-8000-000000000000"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Empty list', () => pm.expect(pm.response.json()).to.eql([]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Audit without transactionId → 400",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/audit",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "audit"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('RFC 9457 ProblemDetail', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.code).to.eql('BAD_REQUEST');",
+                  "  pm.expect(b.status).to.eql(400);",
+                  "  pm.expect(b.transactionId).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Audit with invalid transactionId → 400",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/audit?transactionId=not-a-uuid",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "audit"
+              ],
+              "query": [
+                {
+                  "key": "transactionId",
+                  "value": "not-a-uuid"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('RFC 9457 ProblemDetail', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.code).to.eql('BAD_REQUEST');",
+                  "  pm.expect(b.status).to.eql(400);",
+                  "  pm.expect(b.transactionId).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Audit without API key → 401",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/audit?transactionId={{checkoutTx}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "audit"
+              ],
+              "query": [
+                {
+                  "key": "transactionId",
+                  "value": "{{checkoutTx}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));",
+                  "pm.test('RFC 9457 ProblemDetail', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.code).to.eql('INVALID_API_KEY');",
+                  "  pm.expect(b.status).to.eql(401);",
+                  "  pm.expect(b.transactionId).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Audit with a customer JWT → 401 (API key only)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/audit?transactionId={{checkoutTx}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "audit"
+              ],
+              "query": [
+                {
+                  "key": "transactionId",
+                  "value": "{{checkoutTx}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));",
+                  "pm.test('RFC 9457 ProblemDetail', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.code).to.eql('INVALID_API_KEY');",
                   "  pm.expect(b.status).to.eql(401);",
                   "  pm.expect(b.transactionId).to.be.a('string');",
                   "});"
