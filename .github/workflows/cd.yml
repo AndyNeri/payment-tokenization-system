@@ -1,0 +1,85 @@
+# Continuous Delivery: every green CI run on main is deployed to Cloud Run.
+# Authentication: Workload Identity Federation (GitHub OIDC token -> short-lived GCP credentials). No JSON keys.
+# Setup from scratch: docs/deploy-gcp.md
+name: CD
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write          # lets the job request the OIDC token that GCP exchanges for credentials
+
+concurrency:
+  group: cd-production
+  cancel-in-progress: false   # never interrupt a deployment halfway
+
+env:
+  PROJECT_ID: tokenization-system
+  REGION: us-central1
+  SERVICE: payment-tokenization-system
+  IMAGE: us-central1-docker.pkg.dev/tokenization-system/app/payment-tokenization-system
+  WIF_PROVIDER: projects/871744551746/locations/global/workloadIdentityPools/github/providers/github-repo
+  DEPLOYER_SA: github-deployer@tokenization-system.iam.gserviceaccount.com
+
+jobs:
+  deploy:
+    name: Deploy to Cloud Run
+    # only after a successful CI triggered by a push to main (a merged PR), or manually
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: production
+      url: ${{ steps.url.outputs.url }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}   # deploy exactly the commit CI tested
+
+      - id: auth
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.DEPLOYER_SA }}
+
+      - uses: google-github-actions/setup-gcloud@v3
+
+      - name: Docker login to Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Build and push image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: ${{ env.IMAGE }}:${{ github.event.workflow_run.head_sha || github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Deploy new revision
+        # Only the image changes: env vars, secrets, Cloud SQL and scaling were set once (docs/deploy-gcp.md § 7)
+        run: |
+          gcloud run deploy "$SERVICE" --region="$REGION" --quiet \
+            --image="$IMAGE:${{ github.event.workflow_run.head_sha || github.sha }}"
+
+      - id: url
+        name: Service URL
+        run: echo "url=$(gcloud run services describe "$SERVICE" --region="$REGION" --format='value(status.url)')" >> "$GITHUB_OUTPUT"
+
+      - name: Smoke test (ping, health, Postman health folder)
+        env:
+          URL: ${{ steps.url.outputs.url }}
+        run: |
+          curl --fail --silent --retry 5 --retry-delay 3 --retry-all-errors "$URL/ping" | grep -qx pong
+          curl --fail --silent "$URL/actuator/health" | grep -q '"status":"UP"'
+          npx --yes newman@6 run postman/payment-tokenization.postman_collection.json \
+            -e postman/gcp.postman_environment.json --env-var "baseUrl=$URL" \
+            --folder "0. Health" --reporters cli
