@@ -72,6 +72,13 @@ springdoc:
     path: /swagger-ui.html
 
 app:
+  notification:
+    from: ${MAIL_FROM}                                             # verified sender at the SMTP provider
+  events:
+    retry:                                                         # failed async listeners (e.g. SMTP down)
+      interval: ${EVENTS_RETRY_INTERVAL:1m}
+      min-age: ${EVENTS_RETRY_MIN_AGE:1m}
+      max-attempts: ${EVENTS_RETRY_MAX_ATTEMPTS:5}
   payment:
     rejection-probability: ${PAYMENT_REJECTION_PROBABILITY:0.3}   # per attempt, r < p rejects (ADR-007)
     max-retries: ${PAYMENT_MAX_RETRIES:3}                          # total attempts = 1 + max-retries
