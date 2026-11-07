@@ -14,6 +14,7 @@ Reto técnico de backend para Farmatodo: tokenización de tarjetas de crédito, 
 | [Decisiones (ADR)](docs/decisions.md) | Por qué hexagonal, Java 25, AES-256-GCM, API Key + JWT, checkout síncrono, Modulith, Cloud Run |
 | [Modelo de datos](docs/data-model.md) | ERD y tablas |
 | [API](docs/api.md) | Endpoints, autenticación, ejemplos y catálogo de errores |
+| [Despliegue en GCP](docs/deploy-gcp.md) | Paso a paso desde cero: Cloud SQL, Secret Manager, Cloud Run, CD con Workload Identity Federation |
 | [Flujos](docs/sequences.md) | Diagramas de secuencia: tokenización, login, búsqueda, checkout |
 | [Diagrama de arquitectura](docs/diagrams/architecture.drawio) | Componentes, protocolos y servicios externos (abrir en [diagrams.net](https://app.diagrams.net)) |
 | [Uso de IA](docs/ai-usage.md) | Herramientas, configuración y prompts usados |
@@ -91,7 +92,19 @@ La tokenización tiene un rechazo aleatorio configurable (422). Esos requests **
 
 En el **CI**, el job `API tests` levanta el stack con `docker compose` (con secretos aleatorios de un solo uso) y ejecuta la colección con Newman en cada push y PR.
 
-## Despliegue en GCP desde cero _(pendiente)_
+## Despliegue en GCP desde cero
+La guía completa, con todos los comandos, está en **[docs/deploy-gcp.md](docs/deploy-gcp.md)**. En resumen:
+
+| Pieza | Servicio |
+|---|---|
+| App (contenedor) | **Cloud Run** (us-central1), cuenta de servicio propia con permisos mínimos |
+| Base de datos | **Cloud SQL** PostgreSQL 18, conexión por el *Cloud SQL Java Connector* (IAM + TLS, sin IPs abiertas) |
+| Secretos | **Secret Manager** → variables de entorno (`API_KEY`, `JWT_SECRET`, `CARD_ENCRYPTION_KEY`, `DB_PASSWORD`, `SMTP_*`) |
+| Imágenes | **Artifact Registry** |
+| Correo | SMTP transaccional (**Brevo**, 587 STARTTLS) |
+| CD | **GitHub Actions** con **Workload Identity Federation** (sin llaves JSON) |
+
+Pasos: (1) configuración de gcloud aislada, (2) activar APIs, (3) Cloud SQL + usuario, (4) secretos, (5) Artifact Registry + cuenta de servicio, (6) primera imagen, (7) `gcloud run deploy`, (8) WIF + workflow de CD.
 
 ## CI/CD
 **CI** (`.github/workflows/ci.yml`), en cada push y pull request:
@@ -100,4 +113,4 @@ En el **CI**, el job `API tests` levanta el stack con `docker compose` (con secr
 3. **Pruebas de API:** el stack completo con Docker Compose + la colección Postman con Newman (reporte JUnit como artefacto).
 4. **Build de la imagen Docker.**
 
-**CD** _(pendiente)_: despliegue en Cloud Run.
+**CD** (`.github/workflows/cd.yml`): cuando el CI termina en verde en `main`, construye la imagen, la sube a Artifact Registry, despliega una revisión nueva en Cloud Run y hace un *smoke test* contra la URL real (`/ping`, `/actuator/health` y la carpeta *Health* de Postman). Se autentica con Workload Identity Federation.

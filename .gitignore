@@ -35,3 +35,6 @@ logs/
 # Material privado de preparación (no se sube)
 docs/defensa/
 CLAUDE.local.md
+
+# Respaldo automático de draw.io
+*.drawio.bkp
