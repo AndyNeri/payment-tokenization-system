@@ -68,7 +68,7 @@ export JAVA_HOME=$(/usr/libexec/java_home -v 25)   # macOS: si tu JDK por defect
 
 | Archivo | Contenido |
 |---|---|
-| `postman/payment-tokenization.postman_collection.json` | 41 requests en 7 carpetas (Health, Customers, Auth, Tokenization, Products, Cart, Orders), con 165 aserciones automáticas |
+| `postman/payment-tokenization.postman_collection.json` | 48 requests en 8 carpetas (Health, Customers, Auth, Tokenization, Products, Cart, Orders, Audit), con 195 aserciones automáticas |
 | `postman/local.postman_environment.json` | `baseUrl = http://localhost:8080` |
 | `postman/gcp.postman_environment.json` | `baseUrl` = URL de Cloud Run |
 

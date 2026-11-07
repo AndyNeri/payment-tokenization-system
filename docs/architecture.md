@@ -73,20 +73,26 @@ com.farmatodo.challenge.<slice>
 | | | `PaymentGateway` | `SimulatedPaymentGateway` (probabilidad) |
 | | | `Backoff` | `ThreadSleepBackoff` (exponencial; en hilos virtuales no bloquea un hilo del SO) |
 | | | `ProductInventory` | API de `product` (`UPDATE` atómico condicional) |
-| notification | (listener de eventos) | `EmailSender` | `SmtpEmailSender` (Spring Mail) |
-| audit | `AuditLog` (API pública) | `AuditRepository` | JPA |
+| notification | `PaymentNotificationListener` (eventos) | `EmailSender` | `SmtpEmailSender` (Spring Mail: Mailpit en local, Brevo en la nube) |
+| audit | `AuditListener` (eventos), `AuditQueryService` → `GET /api/v1/audit` | `AuditLog` | `JpaAuditLog` (tabla `audit_events`, `details` en JSONB) |
 
 ## 4. Comunicación entre slices
 
 | Productor | Evento | Consumidor | Modo |
 |---|---|---|---|
 | product | `ProductsSearched` | product (search log) | Asíncrono, transaccional |
+| product | `ProductsSearched` | audit | Asíncrono |
+| customer | `CustomerRegistered` | audit | Asíncrono |
+| order | `OrderPlaced`, `PaymentAttempted` | audit | Asíncrono |
 | order | `PaymentSucceeded` | notification, audit | Asíncrono |
 | order | `PaymentFailed` | notification, audit | Asíncrono |
 | tokenization | `CardTokenized` / `TokenizationRejected` | audit | Asíncrono |
+| notification | `NotificationSent` | audit | Asíncrono |
+
+`audit` solo **depende** de los eventos públicos de los demás módulos; ningún módulo depende de `audit`. Agregar o quitar la auditoría no toca el código de negocio.
 
 - Se usa `@ApplicationModuleListener` de **Spring Modulith**, que combina `@Async`, `@Transactional(REQUIRES_NEW)` y `@TransactionalEventListener(AFTER_COMMIT)`.
-- El **Event Publication Registry** (tabla `event_publication`) guarda cada evento antes de entregarlo. Si la app se cae o el SMTP falla, el evento queda *incompleto* y se reintenta al reiniciar o con un job programado. Así **no se pierden** correos ni logs de búsqueda.
+- El **Event Publication Registry** (tabla `event_publication`) guarda cada evento antes de entregarlo. Si el listener falla (por ejemplo, el SMTP está caído), la publicación queda en estado `FAILED`; un job programado (`EventRetryConfig`) la reenvía cada `EVENTS_RETRY_INTERVAL`, hasta `EVENTS_RETRY_MAX_ATTEMPTS` intentos. Si la app se cae, los eventos pendientes se reenvían al reiniciar. Así **no se pierden** correos ni logs de búsqueda.
 - El executor asíncrono usa **hilos virtuales** (`spring.threads.virtual.enabled=true`).
 
 ## 5. Seguridad
@@ -129,8 +135,11 @@ com.farmatodo.challenge.<slice>
 | `app.security.jwt.secret` | `JWT_SECRET` | — (obligatoria) | ≥ 32 bytes |
 | `app.security.jwt.ttl` | `JWT_TTL` | `30m` | > 0 |
 | `app.crypto.keys` / `app.crypto.active-key-id` | `CARD_ENCRYPTION_KEY` (base64, 32 bytes) | — (obligatoria) | 256 bits |
-| `app.notification.from` | `MAIL_FROM` | — | email |
-| `spring.mail.*` | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD` | Mailpit en local | — |
+| `app.notification.from` | `MAIL_FROM` | — (obligatoria) | email; remitente verificado en el proveedor |
+| `spring.mail.*` | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_AUTH`, `SMTP_STARTTLS` | Mailpit en local | — |
+| `app.events.retry.interval` | `EVENTS_RETRY_INTERVAL` | `1m` | cada cuánto se buscan eventos fallidos |
+| `app.events.retry.min-age` | `EVENTS_RETRY_MIN_AGE` | `1m` | antigüedad mínima antes de reintentar |
+| `app.events.retry.max-attempts` | `EVENTS_RETRY_MAX_ATTEMPTS` | `5` | 1–20; después queda `FAILED` para revisión manual |
 | `spring.datasource.*` | `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` | Postgres local | — |
 
 Perfiles: `local` (docker-compose), `test` (Testcontainers) y `prod` (Cloud Run + Secret Manager montado como variables de entorno).

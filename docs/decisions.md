@@ -132,6 +132,8 @@ Formato corto: **Contexto → Decisión → Alternativas → Consecuencias**.
 
 **Consecuencias.** Se agrega una tabla (`event_publication`) y una dependencia. Si se extraen microservicios, los mismos eventos pasan a un broker (Modulith soporta *externalization*).
 
+**Reintentos (agregado).** Un listener que falla deja su publicación en estado `FAILED`. `EventRetryConfig` la reenvía periódicamente (`FailedEventPublications.resubmit`) con una antigüedad mínima y un máximo de intentos: así un SMTP caído se recupera solo, y un mensaje "veneno" no se reintenta para siempre. Probado en Docker: con Mailpit apagado el pedido queda `PAID`, el correo queda `FAILED`, y al levantar Mailpit llega solo en el siguiente ciclo. Como el listener puede ejecutarse más de una vez, la entrega es *at-least-once*: en el peor caso un cliente recibe el mismo correo dos veces (aceptable para una notificación; para un cobro no lo sería).
+
 ---
 
 ## ADR-010 · Cloud Run + Cloud SQL + Secret Manager, CI/CD con GitHub Actions y WIF
