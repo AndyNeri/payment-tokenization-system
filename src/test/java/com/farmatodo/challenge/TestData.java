@@ -29,4 +29,19 @@ public final class TestData {
     public static int stockOf(JdbcTemplate jdbc, UUID productId) {
         return jdbc.queryForObject("select stock from products where id = ?", Integer.class, productId);
     }
+
+    /** Polls a count query until it reaches {@code expected} (async listeners) or 10 s pass; returns the last value. */
+    public static int awaitCount(JdbcTemplate jdbc, int expected, String sql, Object... args) throws InterruptedException {
+        java.time.Instant deadline = java.time.Instant.now().plusSeconds(10);
+        int count = 0;
+        while (java.time.Instant.now().isBefore(deadline)) {
+            Integer value = jdbc.queryForObject(sql, Integer.class, args);
+            count = value == null ? 0 : value;
+            if (count >= expected) {
+                return count;
+            }
+            Thread.sleep(100);
+        }
+        return count;
+    }
 }

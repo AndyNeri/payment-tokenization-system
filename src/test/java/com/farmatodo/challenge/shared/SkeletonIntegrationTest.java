@@ -116,9 +116,9 @@ class SkeletonIntegrationTest {
 
         @Test
         void acceptsValidApiKey() {
-            // No controller yet for this route: getting past security yields 404, not 401
-            assertThat(mvc.get().uri("/api/v1/audit").header("X-API-Key", API_KEY))
-                    .hasStatus(HttpStatus.NOT_FOUND);
+            assertThat(mvc.get().uri("/api/v1/audit").param("transactionId", UUID.randomUUID().toString())
+                    .header("X-API-Key", API_KEY))
+                    .hasStatusOk();
         }
 
         @Test

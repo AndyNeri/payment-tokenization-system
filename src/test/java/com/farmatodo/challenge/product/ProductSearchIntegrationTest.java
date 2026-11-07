@@ -108,9 +108,9 @@ class ProductSearchIntegrationTest {
         Integer stored = awaitCount("select count(*) from search_logs where transaction_id = ? and query = 'vitamina' "
                 + "and customer_id = ? and results_count = ?", transactionId, customerId, total);
         assertThat(stored).isEqualTo(1);
-        // the outbox entry is marked completed once the listener finished
-        assertThat(awaitCount("select count(*) from event_publication where completion_date is not null "
-                + "and serialized_event like ?", "%" + transactionId + "%")).isEqualTo(1);
+        // one outbox entry per listener (search log + audit), each marked completed once its listener finished
+        assertThat(TestData.awaitCount(jdbc, 2, "select count(*) from event_publication where completion_date is not null "
+                + "and serialized_event like ?", "%" + transactionId + "%")).isEqualTo(2);
     }
 
     private Integer awaitCount(String sql, Object... args) throws InterruptedException {
