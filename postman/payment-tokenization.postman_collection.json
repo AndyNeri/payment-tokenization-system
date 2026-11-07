@@ -65,6 +65,14 @@
     {
       "key": "scarceExceed",
       "value": ""
+    },
+    {
+      "key": "orderId",
+      "value": ""
+    },
+    {
+      "key": "orderStatus",
+      "value": ""
     }
   ],
   "item": [
@@ -1743,6 +1751,348 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6. Orders",
+      "item": [
+        {
+          "name": "Checkout with a card of nobody → 404",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "orders"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cardToken\": \"tok_doesNotExist0000000000000000000000\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));",
+                  "pm.test('RFC 9457 ProblemDetail', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.code).to.eql('CARD_NOT_FOUND');",
+                  "  pm.expect(b.status).to.eql(404);",
+                  "  pm.expect(b.transactionId).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Checkout (place order)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "orders"
+              ]
+            },
+            "description": "Paga todo el carrito. El pago simulado puede ser rechazado (probabilidad configurable) y se reintenta N veces: la respuesta es 201 con status PAID o PAYMENT_FAILED.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cardToken\": \"{{cardToken}}\",\n  \"deliveryAddress\": \"Calle de entrega 45, Caracas\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201 + Location', () => {",
+                  "  pm.response.to.have.status(201);",
+                  "  pm.expect(pm.response.headers.get('Location')).to.match(/\\/api\\/v1\\/orders\\/.+/);",
+                  "});",
+                  "const b = pm.response.json();",
+                  "pm.collectionVariables.set('orderId', b.id);",
+                  "pm.collectionVariables.set('orderStatus', b.status);",
+                  "pm.test('Order snapshot: items, total, masked card, delivery address', () => {",
+                  "  pm.expect(b.items).to.have.length.above(0);",
+                  "  const sum = b.items.reduce((acc, i) => acc + i.subtotal, 0);",
+                  "  pm.expect(b.total).to.be.closeTo(sum, 0.001);",
+                  "  pm.expect(b.card.last4).to.eql('1111');",
+                  "  pm.expect(b.deliveryAddress).to.eql('Calle de entrega 45, Caracas');",
+                  "});",
+                  "pm.test('Payment outcome is consistent with its attempts', () => {",
+                  "  const results = b.paymentAttempts.map(a => a.result);",
+                  "  pm.expect(['PAID', 'PAYMENT_FAILED']).to.include(b.status);",
+                  "  if (b.status === 'PAID') {",
+                  "    pm.expect(results[results.length - 1]).to.eql('APPROVED');",
+                  "    pm.expect(results.slice(0, -1).every(r => r === 'REJECTED')).to.be.true;",
+                  "  } else {",
+                  "    pm.expect(results.every(r => r === 'REJECTED')).to.be.true;",
+                  "    pm.expect(results.length).to.be.above(1);   // it retried",
+                  "  }",
+                  "  console.log(`Order ${b.status} after ${results.length} attempt(s): ${results.join(', ')}`);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get order",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders/{{orderId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "orders",
+                "{{orderId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Same order and status', () => {",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.id).to.eql(pm.collectionVariables.get('orderId'));",
+                  "  pm.expect(b.status).to.eql(pm.collectionVariables.get('orderStatus'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "My orders",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/me/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "me",
+                "orders"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Contains the new order', () => {",
+                  "  pm.expect(pm.response.json().map(o => o.id)).to.include(pm.collectionVariables.get('orderId'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cart after checkout",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/me/cart",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "me",
+                "cart"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Emptied if PAID, kept if PAYMENT_FAILED (so the customer can retry)', () => {",
+                  "  const paid = pm.collectionVariables.get('orderStatus') === 'PAID';",
+                  "  const items = pm.response.json().items;",
+                  "  if (paid) { pm.expect(items).to.eql([]); } else { pm.expect(items.length).to.be.above(0); }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Unknown order → 404",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders/00000000-0000-7000-8000-000000000000",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "orders",
+                "00000000-0000-7000-8000-000000000000"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));",
+                  "pm.test('RFC 9457 ProblemDetail', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.code).to.eql('ORDER_NOT_FOUND');",
+                  "  pm.expect(b.status).to.eql(404);",
+                  "  pm.expect(b.transactionId).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Checkout without token → 401",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "orders"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cardToken\": \"{{cardToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));",
+                  "pm.test('RFC 9457 ProblemDetail', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.code).to.eql('UNAUTHORIZED');",
+                  "  pm.expect(b.status).to.eql(401);",
+                  "  pm.expect(b.transactionId).to.be.a('string');",
+                  "});"
                 ]
               }
             }

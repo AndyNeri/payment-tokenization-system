@@ -5,6 +5,10 @@ spring:
     port: 3025
 
 app:
+  payment:
+    rejection-probability: 0.0       # deterministic: failures are covered by dedicated tests
+    max-retries: 3
+    retry-backoff: 0ms
   tokenization:
     rejection-probability: 0.0       # deterministic: rejection is covered by dedicated tests
   crypto:

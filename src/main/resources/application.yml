@@ -72,6 +72,10 @@ springdoc:
     path: /swagger-ui.html
 
 app:
+  payment:
+    rejection-probability: ${PAYMENT_REJECTION_PROBABILITY:0.3}   # per attempt, r < p rejects (ADR-007)
+    max-retries: ${PAYMENT_MAX_RETRIES:3}                          # total attempts = 1 + max-retries
+    retry-backoff: ${PAYMENT_RETRY_BACKOFF:200ms}                  # doubles each retry (200, 400, 800ms...)
   product:
     min-stock: ${PRODUCT_MIN_STOCK:0}  # searches show only products with stock > min-stock
   tokenization:

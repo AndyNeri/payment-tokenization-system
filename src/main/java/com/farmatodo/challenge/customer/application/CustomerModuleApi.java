@@ -33,6 +33,13 @@ class CustomerModuleApi implements CustomerDirectory, CustomerAuthenticator {
         return customers.existsById(customerId);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<CustomerContact> contactOf(UUID customerId) {
+        return customers.findById(customerId)
+                .map(c -> new CustomerContact(c.id(), c.firstName(), c.lastName(), c.email(), c.address()));
+    }
+
     /**
      * When the email does not exist we still run a BCrypt comparison against a dummy hash, so the response time
      * is the same as for a wrong password: timing does not reveal which emails are registered (user enumeration).
