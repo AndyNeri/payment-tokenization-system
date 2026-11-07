@@ -17,6 +17,7 @@
     <description>Card tokenization, customers, products, cart and orders with simulated payments</description>
 
     <properties>
+        <cloud-sql-socket-factory.version>1.28.4</cloud-sql-socket-factory.version>
         <java.version>25</java.version>
         <spring-modulith.version>2.1.2</spring-modulith.version>
         <springdoc.version>3.2.0</springdoc.version>
@@ -67,6 +68,13 @@
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+        <!-- Cloud Run -> Cloud SQL without public IP allow-lists: IAM-authorized, TLS-encrypted connector -->
+        <dependency>
+            <groupId>com.google.cloud.sql</groupId>
+            <artifactId>postgres-socket-factory</artifactId>
+            <version>${cloud-sql-socket-factory.version}</version>
             <scope>runtime</scope>
         </dependency>
 
