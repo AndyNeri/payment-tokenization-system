@@ -253,19 +253,44 @@ Location: /api/v1/orders/0193c...
 > Configuración del pago: `PAYMENT_REJECTION_PROBABILITY` (por intento, default 0.3), `PAYMENT_MAX_RETRIES` (default 3 → hasta 4 intentos) y `PAYMENT_RETRY_BACKOFF` (default 200ms, se duplica en cada reintento: 200, 400, 800 ms).
 
 ## Auditoría
+Todo lo que pasó dentro de un `transactionId` (el header `X-Transaction-Id` que devuelve cada respuesta), del más antiguo al más reciente. Se escribe de forma **asíncrona**: puede tardar unos milisegundos en aparecer después de la respuesta original.
+
 ```http
 GET /api/v1/audit?transactionId=5f0c...
 X-API-Key: <llave>
 
 200 OK
 [
-  { "eventType": "ORDER_CREATED",    "entityType": "ORDER", "entityId": "0193c...", "outcome": "SUCCESS", "createdAt": "..." },
-  { "eventType": "PAYMENT_ATTEMPT",  "entityType": "ORDER", "entityId": "0193c...", "outcome": "FAILURE", "details": { "attempt": 1 }, "createdAt": "..." },
-  { "eventType": "PAYMENT_ATTEMPT",  "entityType": "ORDER", "entityId": "0193c...", "outcome": "SUCCESS", "details": { "attempt": 2 }, "createdAt": "..." },
-  { "eventType": "PAYMENT_SUCCEEDED","entityType": "ORDER", "entityId": "0193c...", "outcome": "SUCCESS", "createdAt": "..." },
-  { "eventType": "EMAIL_SENT",       "entityType": "ORDER", "entityId": "0193c...", "outcome": "SUCCESS", "createdAt": "..." }
+  { "id": "...", "transactionId": "5f0c...", "eventType": "ORDER_PLACED",      "entityType": "ORDER", "entityId": "0193c...", "outcome": "SUCCESS", "details": { "customerId": "...", "total": 21.0, "items": 2 }, "occurredAt": "..." },
+  { "id": "...", "transactionId": "5f0c...", "eventType": "PAYMENT_ATTEMPTED", "entityType": "ORDER", "entityId": "0193c...", "outcome": "FAILURE", "details": { "attempt": 1, "result": "REJECTED" }, "occurredAt": "..." },
+  { "id": "...", "transactionId": "5f0c...", "eventType": "PAYMENT_ATTEMPTED", "entityType": "ORDER", "entityId": "0193c...", "outcome": "SUCCESS", "details": { "attempt": 2, "result": "APPROVED" }, "occurredAt": "..." },
+  { "id": "...", "transactionId": "5f0c...", "eventType": "PAYMENT_SUCCEEDED", "entityType": "ORDER", "entityId": "0193c...", "outcome": "SUCCESS", "details": { "total": 21.0, "attempts": 2 }, "occurredAt": "..." },
+  { "id": "...", "transactionId": "5f0c...", "eventType": "EMAIL_SENT",        "entityType": "ORDER", "entityId": "0193c...", "outcome": "SUCCESS", "details": { "type": "PAYMENT_SUCCEEDED_EMAIL", "customerId": "..." }, "occurredAt": "..." }
 ]
 ```
+
+| `eventType` | Origen | `outcome` |
+|---|---|---|
+| `CUSTOMER_REGISTERED` | registro de cliente | SUCCESS |
+| `CARD_TOKENIZED` / `TOKENIZATION_REJECTED` | tokenización (solo marca y últimos 4) | SUCCESS / FAILURE |
+| `PRODUCTS_SEARCHED` | búsqueda de productos | SUCCESS |
+| `ORDER_PLACED` | checkout | SUCCESS |
+| `PAYMENT_ATTEMPTED` | cada intento de pago | SUCCESS si fue aprobado, FAILURE si fue rechazado |
+| `PAYMENT_SUCCEEDED` / `PAYMENT_FAILED` | resultado final del pago | SUCCESS / FAILURE |
+| `EMAIL_SENT` | correo entregado al servidor SMTP | SUCCESS |
+
+- Errores: sin API key (o con un JWT) → 401 `INVALID_API_KEY`; sin `transactionId` o con un valor que no es UUID → 400 `BAD_REQUEST`. Un `transactionId` desconocido devuelve `[]`.
+- La auditoría **nunca** guarda el número de tarjeta, el CVV, correos ni contraseñas.
+
+## Correos
+No hay endpoint: los correos salen solos al terminar un checkout.
+
+| Evento | Asunto | Contenido |
+|---|---|---|
+| Pago aprobado | `Pago aprobado - pedido <últimos 8 del id>` | pedido, total, fecha, número de intentos |
+| Pago fallido | `No pudimos procesar tu pago - pedido <…>` | pedido, total, intentos; aclara que no hubo cobro y que el carrito se conserva |
+
+Se envían de forma asíncrona por SMTP (Mailpit en local, Brevo en la nube). Si el SMTP está caído, el pedido igual se completa y el correo se **reintenta automáticamente** (ver `EVENTS_RETRY_*` en `docs/architecture.md` § 6).
 
 ---
 

@@ -56,5 +56,13 @@ class OrderPaymentFailureIntegrationTest {
                 .isEqualTo("PAYMENT_FAILED");
         assertThat(jdbc.queryForObject("select count(*) from payment_attempts where order_id = ?::uuid",
                 Integer.class, orderId)).isEqualTo(3);
+
+        // the customer is told by email, and the audit trail shows the failure story under the same transactionId
+        String transactionId = result.getResponse().getHeader("X-Transaction-Id");
+        assertThat(TestData.awaitCount(jdbc, 1, "select count(*) from audit_events where transaction_id = ?::uuid "
+                + "and event_type = 'EMAIL_SENT' and details ->> 'type' = 'PAYMENT_FAILED_EMAIL'", transactionId))
+                .isEqualTo(1);
+        assertThat(TestData.awaitCount(jdbc, 6, "select count(*) from audit_events where transaction_id = ?::uuid",
+                transactionId)).isEqualTo(6);   // ORDER_PLACED + 3 PAYMENT_ATTEMPTED + PAYMENT_FAILED + EMAIL_SENT
     }
 }

@@ -128,7 +128,7 @@ sequenceDiagram
     loop intento = 1 .. 1 + maxRetries
         U->>G: charge(card, total)
         G->>G: r < p ? REJECTED : APPROVED
-        U->>DB: INSERT payment_attempt + audit
+        U->>DB: INSERT payment_attempt + publish PaymentAttempted
         opt APPROVED
             Note over U: sale del loop
         end
@@ -147,7 +147,12 @@ sequenceDiagram
 
     DB-)N: evento (async, después del commit)
     N->>M: SMTP 587 STARTTLS — email de éxito o fallo
-    N->>DB: audit EMAIL_SENT / EMAIL_FAILED
+    alt SMTP responde
+        N->>DB: publish NotificationSent → audit EMAIL_SENT
+    else SMTP caído
+        Note over N,DB: la publicación queda FAILED; EventRetryConfig la reenvía cada minuto (máx. 5 intentos)
+    end
+    DB-)DB: audit (async): ORDER_PLACED, PAYMENT_ATTEMPTED×n, PAYMENT_SUCCEEDED/FAILED con el mismo transactionId
 ```
 
 ### Transacciones del checkout

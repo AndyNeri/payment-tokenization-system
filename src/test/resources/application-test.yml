@@ -1,10 +1,17 @@
 # Test-only values (fake, not secrets). The datasource is provided by Testcontainers (@ServiceConnection).
 spring:
-  mail:
+  mail:                              # overridden by the Mailpit Testcontainer (TestcontainersConfiguration)
     host: localhost
     port: 3025
 
 app:
+  notification:
+    from: no-reply@test.local
+  events:
+    retry:
+      interval: 1h                   # tests trigger the resubmission explicitly
+      min-age: 0s
+      max-attempts: 3
   payment:
     rejection-probability: 0.0       # deterministic: failures are covered by dedicated tests
     max-retries: 3
