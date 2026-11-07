@@ -19,6 +19,8 @@ public final class Ports {
 
         Optional<Card> findByToken(String token);
 
+        Optional<Card> findById(UUID id);
+
         List<Card> findByCustomer(UUID customerId);
     }
 

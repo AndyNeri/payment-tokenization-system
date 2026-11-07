@@ -34,6 +34,11 @@ class JpaCardVault implements CardVault {
     }
 
     @Override
+    public Optional<Card> findById(UUID id) {
+        return repository.findById(id).map(JpaCardVault::toDomain);
+    }
+
+    @Override
     public List<Card> findByCustomer(UUID customerId) {
         return repository.findByCustomerIdOrderByCreatedAtDesc(customerId).stream()
                 .map(JpaCardVault::toDomain)
