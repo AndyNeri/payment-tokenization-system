@@ -71,6 +71,7 @@ com.farmatodo.challenge.<slice>
 | cart | `CartUseCase` | `CartRepository`, `ProductCatalog` | JPA / API de `product` |
 | order | `PlaceOrderUseCase`, `GetOrderUseCase` | `OrderRepository` | JPA |
 | | | `PaymentGateway` | `SimulatedPaymentGateway` (probabilidad) |
+| | | `Backoff` | `ThreadSleepBackoff` (exponencial; en hilos virtuales no bloquea un hilo del SO) |
 | | | `ProductInventory` | API de `product` (`UPDATE` atómico condicional) |
 | notification | (listener de eventos) | `EmailSender` | `SmtpEmailSender` (Spring Mail) |
 | audit | `AuditLog` (API pública) | `AuditRepository` | JPA |

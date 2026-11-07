@@ -30,6 +30,7 @@
 | DELETE | `/api/v1/me/cart/items/{productId}` | JWT | 200 | 401, 404 |
 | POST | `/api/v1/orders` | JWT | 201 | 400, 401, 404, 409 |
 | GET | `/api/v1/orders/{orderId}` | JWT | 200 | 401, 404 |
+| GET | `/api/v1/me/orders` | JWT | 200 | 401 |
 | GET | `/api/v1/audit?transactionId=` | API Key | 200 | 400, 401 |
 
 `{slice}` ∈ `tokens`, `customers`, `products`, `cart`, `orders`.
@@ -245,6 +246,11 @@ Location: /api/v1/orders/0193c...
 
 ### Consultar pedido
 `GET /api/v1/orders/{orderId}` → 200 (mismo cuerpo) · `404 ORDER_NOT_FOUND` si no existe o no es del cliente.
+
+### Mis pedidos
+`GET /api/v1/me/orders` → 200 con la lista de pedidos del cliente autenticado, del más reciente al más antiguo.
+
+> Configuración del pago: `PAYMENT_REJECTION_PROBABILITY` (por intento, default 0.3), `PAYMENT_MAX_RETRIES` (default 3 → hasta 4 intentos) y `PAYMENT_RETRY_BACKOFF` (default 200ms, se duplica en cada reintento: 200, 400, 800 ms).
 
 ## Auditoría
 ```http
