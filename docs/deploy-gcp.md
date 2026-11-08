@@ -126,7 +126,7 @@ gcloud run deploy $SERVICE --image=${IMAGE}:manual-1 --region=$REGION \
   --service-account=$RUN_SA \
   --add-cloudsql-instances=${PROJECT_ID}:${REGION}:${SQL_INSTANCE} \
   --no-allow-unauthenticated \
-  --cpu=1 --memory=1Gi --cpu-boost --min-instances=0 --max-instances=3 --concurrency=80 \
+  --cpu=1 --memory=1Gi --cpu-boost --no-cpu-throttling --min-instances=1 --max-instances=3 --concurrency=80 \
   --set-env-vars="$ENVS" \
   --set-secrets="DB_PASSWORD=db-password:latest,API_KEY=api-key:latest,JWT_SECRET=jwt-secret:latest,CARD_ENCRYPTION_KEY=card-encryption-key:latest,SMTP_USERNAME=smtp-username:latest,SMTP_PASSWORD=smtp-password:latest"
 ```
@@ -134,7 +134,9 @@ gcloud run deploy $SERVICE --image=${IMAGE}:manual-1 --region=$REGION \
 - **Conexión a la BD:** el *Cloud SQL Java Connector* (`postgres-socket-factory`) cifra la conexión con TLS y la autoriza con IAM (rol `cloudsql.client`). No hay que abrir IPs.
 - **Esquema:** en el primer arranque, Flyway aplica `V1..V4` (tablas, índices y los 40 productos del seed).
 - **Pool de conexiones:** 5 conexiones × 3 instancias = 15, por debajo del límite de `db-f1-micro` (~25).
-- **`--min-instances=0`:** escala a cero (costo ~0 sin tráfico), pero la primera petición tarda unos segundos (*cold start*). `--cpu-boost` lo reduce. Para una demo sin esperas se puede usar `--min-instances=1`.
+- **`--no-cpu-throttling` (CPU siempre asignada):** por defecto Cloud Run solo da CPU **mientras atiende una petición**. Esta app hace trabajo **después** de responder: correos, auditoría y el job que reintenta eventos fallidos cada minuto. Sin este flag ese trabajo se frena (medido: el correo tardaba más de 6 s, y sin tráfico los reintentos no corrían). Con él, el correo queda auditado en ~2 s. Ver ADR-012.
+- **`--min-instances=1`:** siempre hay una instancia lista. Elimina el arranque en frío y mantiene vivo el job de reintentos. Costo aproximado: ~12 USD/semana. Fuera de un periodo de evaluación se puede volver a `--min-instances=0`: los eventos pendientes se procesan igual al arrancar la siguiente instancia (`republish-outstanding-events-on-restart`).
+- `--min-instances=1` **sin** `--no-cpu-throttling` no basta: la instancia existe, pero con la CPU frenada entre peticiones.
 
 ### Hacer la API pública
 Se despliega primero privada para verificarla. Después se permite invocarla sin identidad de Google, porque la seguridad la hace la propia app (API key + JWT):

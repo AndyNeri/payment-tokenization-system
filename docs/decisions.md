@@ -166,3 +166,18 @@ Formato corto: **Contexto → Decisión → Alternativas → Consecuencias**.
 **Evidencia.** Prueba de integración: 20 compras concurrentes sobre un producto con stock 5 → exactamente 5 exitosas y stock final 0.
 
 **Consecuencias.** La columna `version` se sigue incrementando para que cualquier escritura vía JPA detecte cambios concurrentes. El carrito **no reserva** stock: solo lo valida al agregar; la reserva ocurre en el checkout.
+
+---
+
+## ADR-012 · Cloud Run con CPU siempre asignada
+
+**Contexto.** Por defecto, Cloud Run asigna CPU solo mientras atiende una petición. La app hace trabajo asíncrono *después* de responder: correos, auditoría y el job que reenvía eventos fallidos (ADR-009). Al validar en producción, el correo de un pedido tardaba más de 6 s en salir, y sin tráfico el job de reintentos prácticamente no corría.
+
+**Decisión.** `--no-cpu-throttling` (CPU siempre asignada mientras la instancia vive) y `--min-instances=1` durante el periodo de evaluación.
+
+**Alternativas.**
+- Solo `--min-instances=1`: elimina el arranque en frío, pero la CPU sigue frenada entre peticiones; no resuelve el problema.
+- Cloud Scheduler llamando a un endpoint de reintentos: la petición tiene CPU, pero el reenvío es asíncrono y vuelve a quedar frenado al responder.
+- Un Cloud Run Job como *worker* (misma imagen, otro modo de ejecución): válido y compatible con el monolito modular, pero suma piezas (job, Scheduler, permisos) y los correos tardarían hasta 1 minuto. Queda como opción para tareas por lotes, por ejemplo expirar pedidos `PENDING_PAYMENT`.
+
+**Consecuencias.** El correo queda auditado en ~2 s y los reintentos corren cada minuto. Costo aproximado: ~12 USD/semana con una instancia siempre activa; después de la evaluación se puede volver a `min-instances=0` sin perder eventos (se reenvían al arrancar).
