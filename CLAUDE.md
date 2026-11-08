@@ -44,8 +44,8 @@ docker compose up --build     # app + postgres + mailpit (UI correos: http://loc
 - Probabilidades: rechazar si `r < p` (ADR-007).
 
 ## Pruebas
-- Toda funcionalidad nueva incluye sus pruebas en el mismo cambio. La cobertura mínima es 80% y el build falla por debajo.
-- Unitarias: dominio y casos de uso sin Spring (mocks de puertos). Integración: `@SpringBootTest` + Testcontainers Postgres.
+- Toda funcionalidad nueva incluye sus pruebas en el mismo cambio. La cobertura **de pruebas unitarias** mínima es 80% y el build falla por debajo.
+- Unitarias (Surefire): dominio, casos de uso, adaptadores y controllers sin Spring (mocks de puertos, MockMvc *standalone* con `StandaloneMvc`). Integración (Failsafe): clases `*IntegrationTest` con `@SpringBootTest` + Testcontainers (PostgreSQL y Mailpit).
 - Si cambias un endpoint, actualiza `docs/api.md` y la colección de `postman/`.
 
 ## Documentación

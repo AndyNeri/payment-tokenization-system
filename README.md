@@ -20,8 +20,8 @@ La **API key** de producción (necesaria para `POST /api/v1/tokens` y `GET /api/
 
 | Indicador | Valor |
 |---|---|
-| Pruebas | 227 (unitarias, integración con PostgreSQL y Mailpit reales, arquitectura) |
-| Cobertura de líneas | 99% (el build falla por debajo de 80%) |
+| Pruebas | 280: 207 unitarias + 73 de integración con PostgreSQL y Mailpit reales |
+| Cobertura de líneas | **93.6% solo con pruebas unitarias** (el build falla por debajo de 80%) · 99.6% total |
 | Pruebas de API | 48 requests · 195 aserciones (CI y contra GCP) |
 | Despliegue | automático en cada merge a `main` (CI verde → Cloud Run) |
 
@@ -38,7 +38,7 @@ La **API key** de producción (necesaria para `POST /api/v1/tokens` y `GET /api/
 | Logs centralizados en BD con UUID por transacción | módulo `audit` · `GET /api/v1/audit?transactionId=` · header `X-Transaction-Id` |
 | Docker + Compose | `Dockerfile` (multi-stage, usuario no root) · `docker-compose.yml` |
 | Seguridad, configuración externa, robustez | API key + JWT, secretos solo por variables de entorno / Secret Manager, errores RFC 9457 |
-| ≥ 80% cobertura, Postman, CI, pruebas continuas, CD | JaCoCo · `postman/` · `.github/workflows/ci.yml` y `cd.yml` |
+| ≥ 80% cobertura de pruebas unitarias, Postman, CI, pruebas continuas, CD | JaCoCo (umbral sobre las unitarias) · `postman/` · `.github/workflows/ci.yml` y `cd.yml` |
 | Despliegue en GCP documentado desde cero | [docs/deploy-gcp.md](docs/deploy-gcp.md) |
 
 La tabla detallada (con secciones y ADRs) está en [docs/architecture.md § 12](docs/architecture.md).
@@ -110,15 +110,23 @@ La app no arranca si falta un secreto o si es débil (validación *fail-fast*).
 export JAVA_HOME=$(/usr/libexec/java_home -v 25)   # macOS: si tu JDK por defecto no es el 25
 ./mvnw verify
 ```
-`verify` ejecuta:
-- Pruebas unitarias.
-- Pruebas de integración contra **PostgreSQL real** (Testcontainers; requiere Docker).
-- Reglas de arquitectura (**ArchUnit**: el dominio no depende de frameworks; **Spring Modulith**: límites entre módulos).
-- El umbral de cobertura **JaCoCo ≥ 80%**: el build falla si no se cumple.
+`verify` ejecuta, en orden:
+1. **Pruebas unitarias** (Surefire, 207): dominio, casos de uso, adaptadores y controllers **sin Spring ni base de datos** (puertos simulados, MockMvc *standalone*).
+2. **Umbral de cobertura unitaria ≥ 80%** (JaCoCo): el build falla si no se cumple.
+3. **Pruebas de integración** (Failsafe, 73, clases `*IntegrationTest`): la app completa contra **PostgreSQL 18 y Mailpit reales** (Testcontainers; requiere Docker).
+4. **Reglas de arquitectura** (**ArchUnit**: el dominio no depende de frameworks; **Spring Modulith**: límites entre módulos).
+
+```bash
+./mvnw test      # solo unitarias (rápidas, sin Docker)
+```
+
+| Cobertura de líneas | Valor | Reporte |
+|---|---|---|
+| **Solo pruebas unitarias** (exigida ≥ 80%) | **93.6%** | `target/site/jacoco-unit/index.html` |
+| Total (unitarias + integración) | 99.6% | `target/site/jacoco/index.html` |
 
 | Reporte | Ruta |
 |---|---|
-| Cobertura | `target/site/jacoco/index.html` |
 | Diagramas de módulos (PlantUML) | `target/spring-modulith-docs/` |
 
 ## Colección Postman
