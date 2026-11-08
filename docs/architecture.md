@@ -174,10 +174,10 @@ Por cada operación se genera `r ∈ [0, 1)` y **se rechaza si `r < p`**. Así `
 | Entorno | Componentes |
 |---|---|
 | **Local** | `docker compose up`: `app` (8080) + `postgres:18` (5432) + `mailpit` (SMTP 1025, UI 8025) |
-| **GCP** (`tokenization-system`, `us-central1`) | **Cloud Run** (HTTPS, escala a cero) · **Cloud SQL PostgreSQL 18** (conexión por el conector integrado de Cloud Run) · **Secret Manager** (DB, API key, JWT, llave AES, SMTP) · **Artifact Registry** (imágenes) · SMTP externo (**Resend/SendGrid**, 587 STARTTLS) |
-| **CI/CD** | GitHub Actions. PR: build, tests, JaCoCo ≥ 80%, ArchUnit/Modulith, Testcontainers, Gitleaks, Trivy. `main`: build de la imagen → push a Artifact Registry → deploy a Cloud Run → **Newman** (colección Postman) contra la URL desplegada. Autenticación con **Workload Identity Federation** (sin llaves JSON). |
+| **GCP** (`tokenization-system`, `us-central1`) | **Cloud Run** (HTTPS, 0–3 instancias, cuenta de servicio propia con permisos mínimos) · **Cloud SQL PostgreSQL 18** (`db-f1-micro`, conexión por el *Cloud SQL Java Connector*: IAM + TLS) · **Secret Manager** (6 secretos → variables de entorno) · **Artifact Registry** (imagen etiquetada con el SHA del commit) · SMTP externo (**Brevo**, 587 STARTTLS). Guía: [deploy-gcp.md](deploy-gcp.md) |
+| **CI/CD** | GitHub Actions. **CI** (cada PR y push): `mvnw verify` (pruebas con Testcontainers PostgreSQL + Mailpit, JaCoCo ≥ 80%, ArchUnit/Modulith), Gitleaks, Newman contra `docker compose`, build de la imagen. **CD** (CI verde en `main`): build `linux/amd64` → push a Artifact Registry → nueva revisión de Cloud Run → *smoke test* (`/ping`, health, carpeta Health de Postman) contra la URL real. Autenticación con **Workload Identity Federation** (sin llaves JSON). |
 
-Imagen: build multi-stage con `eclipse-temurin:25-jre`, usuario no root y caché AOT para reducir el arranque en frío.
+Imagen: build multi-stage (`eclipse-temurin:25-jdk` para compilar, `25-jre` para ejecutar), capas de Spring Boot ordenadas de menos a más cambiantes (mejor caché de Docker) y usuario no root. Mejora posible: caché AOT de Java 25 para reducir el arranque en frío.
 
 ## 11. Supuestos
 
@@ -189,7 +189,7 @@ Imagen: build multi-stage con `eclipse-temurin:25-jre`, usuario no root y caché
 6. El checkout toma todo el carrito del cliente.
 7. "Reintentar N veces" = 1 intento inicial + N reintentos.
 8. No hay refresh tokens; el JWT dura 30 min (mejora futura).
-9. Si Resend se usa sin dominio verificado, solo envía al correo dueño de la cuenta; para la demo se usa ese correo o SendGrid con un remitente verificado.
+9. Sin dominio propio, el remitente es una dirección verificada en Brevo (*single sender*); algunos buzones pueden marcar el correo como spam. En producción se autentica el dominio con SPF/DKIM/DMARC.
 
 ## 12. Trazabilidad de requisitos
 
