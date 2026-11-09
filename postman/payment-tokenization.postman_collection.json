@@ -257,7 +257,8 @@
                   "  pm.expect(b).to.not.have.property('password');",
                   "  pm.expect(b).to.not.have.property('passwordHash');",
                   "});",
-                  "pm.collectionVariables.set('customerId', b.id);"
+                  "// Only overwrite customerId on success, so a failed run does not leave it empty",
+                  "if (pm.response.code === 201 && b.id) pm.collectionVariables.set('customerId', b.id);"
                 ]
               }
             }
@@ -426,7 +427,14 @@
                   "  pm.expect(b.accessToken.split('.')).to.have.length(3);",
                   "  pm.expect(b.expiresIn).to.be.above(0);",
                   "});",
-                  "pm.collectionVariables.set('accessToken', b.accessToken);"
+                  "pm.collectionVariables.set('accessToken', b.accessToken);",
+                  "// The JWT subject (sub) is the customer id: decode the payload (base64url) to keep customerId in sync",
+                  "if (pm.response.code === 200 && b.accessToken) {",
+                  "  const payload = b.accessToken.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');",
+                  "  const claims = JSON.parse(atob(payload.padEnd(payload.length + (4 - payload.length % 4) % 4, '=')));",
+                  "  pm.test('JWT subject is a customer id', () => pm.expect(claims.sub).to.match(/^[0-9a-f-]{36}$/));",
+                  "  pm.collectionVariables.set('customerId', claims.sub);",
+                  "}"
                 ]
               }
             }
