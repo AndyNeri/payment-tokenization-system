@@ -174,8 +174,8 @@ Por cada operación se genera `r ∈ [0, 1)` y **se rechaza si `r < p`**. Así `
 | Entorno | Componentes |
 |---|---|
 | **Local** | `docker compose up`: `app` (8080) + `postgres:18` (5432) + `mailpit` (SMTP 1025, UI 8025) |
-| **GCP** (`tokenization-system`, `us-central1`) | **Cloud Run** (HTTPS, 0–3 instancias, cuenta de servicio propia con permisos mínimos) · **Cloud SQL PostgreSQL 18** (`db-f1-micro`, conexión por el *Cloud SQL Java Connector*: IAM + TLS) · **Secret Manager** (6 secretos → variables de entorno) · **Artifact Registry** (imagen etiquetada con el SHA del commit) · SMTP externo (**Brevo**, 587 STARTTLS). Guía: [deploy-gcp.md](deploy-gcp.md) |
-| **CI/CD** | GitHub Actions. **CI** (cada PR y push): `mvnw verify` (pruebas con Testcontainers PostgreSQL + Mailpit, JaCoCo ≥ 80%, ArchUnit/Modulith), Gitleaks, Newman contra `docker compose`, build de la imagen. **CD** (CI verde en `main`): build `linux/amd64` → push a Artifact Registry → nueva revisión de Cloud Run → *smoke test* (`/ping`, health, carpeta Health de Postman) contra la URL real. Autenticación con **Workload Identity Federation** (sin llaves JSON). |
+| **GCP** (`tokenization-system`, `us-central1`) | **Cloud Run** (HTTPS, 1–3 instancias con CPU siempre asignada para el trabajo asíncrono, ADR-012; cuenta de servicio propia con permisos mínimos) · **Cloud SQL PostgreSQL 18** (`db-f1-micro`, conexión por el *Cloud SQL Java Connector*: IAM + TLS) · **Secret Manager** (6 secretos → variables de entorno) · **Artifact Registry** (imagen etiquetada con el SHA del commit) · SMTP externo (**Brevo**, 587 STARTTLS). Guía: [deploy-gcp.md](deploy-gcp.md) |
+| **CI/CD** | GitHub Actions. **CI** (cada PR y push): `mvnw verify` (207 unitarias con umbral JaCoCo ≥ 80% sobre ellas, 73 de integración con Testcontainers PostgreSQL + Mailpit, ArchUnit/Modulith), Gitleaks, Newman contra `docker compose`, build de la imagen. **CD** (CI verde en `main`): build `linux/amd64` → push a Artifact Registry → nueva revisión de Cloud Run → *smoke test* (`/ping`, health, carpeta Health de Postman) contra la URL real. Autenticación con **Workload Identity Federation** (sin llaves JSON). |
 
 Imagen: build multi-stage (`eclipse-temurin:25-jdk` para compilar, `25-jre` para ejecutar), capas de Spring Boot ordenadas de menos a más cambiantes (mejor caché de Docker) y usuario no root. Mejora posible: caché AOT de Java 25 para reducir el arranque en frío.
 
@@ -207,6 +207,6 @@ Imagen: build multi-stage (`eclipse-temurin:25-jdk` para compilar, `25-jre` para
 | NF | Seguridad (API Key / JWT, cifrado) | § 5; ADR-004, ADR-005 |
 | NF | Concurrencia y configuración externa sin secretos | § 6, § 8 |
 | NF | Robustez (errores y validaciones) | § 7 |
-| NF | Pruebas ≥ 80% + colección Postman | JaCoCo gate en CI; `postman/` |
+| NF | Pruebas unitarias ≥ 80% + colección Postman | JaCoCo: umbral sobre la cobertura unitaria (93.6%); total 99.6%; `postman/` |
 | NF | Mantenibilidad (modular, documentado) | § 2, § 3; reglas ArchUnit/Modulith |
 | NF | DevSecOps: CI, pruebas continuas, CD | § 10 |

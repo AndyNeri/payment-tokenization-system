@@ -210,7 +210,41 @@
                 </executions>
             </plugin>
 
-            <!-- Coverage: build fails below 80% line coverage -->
+            <!-- Unit tests (no Spring context, no database): everything except *IntegrationTest -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <excludes>
+                        <exclude>**/*IntegrationTest.java</exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
+
+            <!-- Integration tests (Spring Boot + Testcontainers PostgreSQL/Mailpit): *IntegrationTest -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <configuration>
+                    <includes>
+                        <include>**/*IntegrationTest.java</include>
+                    </includes>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>integration-test</goal>
+                            <goal>verify</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- Coverage, in this order:
+                 1. unit tests write target/jacoco.exec
+                 2. package: unit report (target/site/jacoco-unit) + build FAILS below 80% unit line coverage
+                 3. integration tests APPEND to the same jacoco.exec
+                 4. verify: total report (target/site/jacoco) -->
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
@@ -228,15 +262,18 @@
                         </goals>
                     </execution>
                     <execution>
-                        <id>report</id>
-                        <phase>verify</phase>
+                        <id>report-unit</id>
+                        <phase>package</phase>
                         <goals>
                             <goal>report</goal>
                         </goals>
+                        <configuration>
+                            <outputDirectory>${project.reporting.outputDirectory}/jacoco-unit</outputDirectory>
+                        </configuration>
                     </execution>
                     <execution>
-                        <id>check</id>
-                        <phase>verify</phase>
+                        <id>check-unit</id>
+                        <phase>package</phase>
                         <goals>
                             <goal>check</goal>
                         </goals>
@@ -254,6 +291,22 @@
                                 </rule>
                             </rules>
                         </configuration>
+                    </execution>
+                    <execution>
+                        <id>prepare-agent-integration</id>
+                        <goals>
+                            <goal>prepare-agent-integration</goal>
+                        </goals>
+                        <configuration>
+                            <destFile>${project.build.directory}/jacoco.exec</destFile>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>report-total</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
                     </execution>
                 </executions>
             </plugin>
